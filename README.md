@@ -68,6 +68,7 @@ Optional env overrides: `COMFY_SERVER`, `COMFY_WORKFLOW_TPL`, `COMFY_PYTHON`,
 | `skills/.../references/prompt-craft.md` | Prompt engineering handbook (official H3 formula + pitfall checklist) |
 | `skills/.../scripts/make-video.sh` | One-line video production script (self-healing) |
 | `assets/workflow_api_mzsj_video.json` | Three-stage API-format workflow template |
+| `examples/workflows/` | Curated library: 16 API-format workflows for video / first-frame / upscaling / product shots — see its [README](examples/workflows/README.md) |
 | `assets/comfyui-nodes/` | Two custom node packs (source) + `config.json.example` |
 | `.qoder-plugin/plugin.json` | Qoder plugin manifest |
 | `CONNECTORS.md` | Which API keys you need and where to put them |
@@ -79,6 +80,13 @@ Optional env overrides: `COMFY_SERVER`, `COMFY_WORKFLOW_TPL`, `COMFY_PYTHON`,
   multi-shot are **not yet** supported — the node layer needs asset-upload capability first
 - mzsjai / huoshenai are third-party API platforms; their pricing and terms are governed
   by their official sites. This project only provides technical integration.
+
+## Related ecosystem
+
+This project believes the real value of agent tooling is a stock of high-quality, ready-to-use workflows and skills:
+
+- **Workflows**: see `examples/workflows/` — 16 curated API-format workflows, credited to [Lesilva/comfyui-workflows](https://github.com/Lesilva/comfyui-workflows)
+- **Skills**: the open SKILL.md standard works across Claude Code / Codex / Gemini CLI / Cursor / Qoder and more. Good starting points: [VoltAgent/awesome-agent-skills](https://github.com/VoltAgent/awesome-agent-skills) (1000+ curated skills) and [awesome-claude-code-skills](https://github.com/helloianneo/awesome-claude-code-skills) (scene-based picks)
 
 ## License
 

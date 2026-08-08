@@ -34,6 +34,7 @@
 | `skills/ai-video-studio/references/prompt-craft.md` | 视频 Prompt 工程手册（已融合官方《MiniMax H3 使用手册》三段公式与踩坑表） |
 | `skills/ai-video-studio/scripts/make-video.sh` | 一句话出片脚本（健康检查→参数注入→提交→轮询→自动打开产物） |
 | `assets/workflow_api_mzsj_video.json` | 三段式 API 格式工作流模板（脚本自带，自包含） |
+| `examples/workflows/` | 精选工作流库：16 个 API 格式 workflow，覆盖视频生成/首帧/放大/产品场景（已注明来源，见目录内 README） |
 | `assets/comfyui-nodes/` | 两个自定义节点包源码 + config.json.example（不含真实 key） |
 | `CONNECTORS.md` | 需要配置的三组 API key 说明（本插件不内置任何凭据） |
 
@@ -65,6 +66,13 @@
 - 官方离线验证器：`validate_qoder_plugin.py <本目录>` 通过
 - 脚本 dry-run 实测：健康检查、参数注入、模板加载均正常
 - 服务自愈实测：停掉后端后脚本自动拉起并继续执行
+
+## 生态推荐
+
+agent 工具的真正价值在于拥有一定量现成、高质量的 workflow 与 skill：
+
+- **Workflow**：见 `examples/workflows/` ——精选 16 个 API 格式工作流，来源 [Lesilva/comfyui-workflows](https://github.com/Lesilva/comfyui-workflows)
+- **Skill**：SKILL.md 开放标准已被 Claude Code / Codex / Gemini CLI / Cursor / Qoder 等 20+ 平台支持。推荐入口：[VoltAgent/awesome-agent-skills](https://github.com/VoltAgent/awesome-agent-skills)（1000+ 精选）、[awesome-claude-code-skills](https://github.com/helloianneo/awesome-claude-code-skills)（按场景精选）
 
 ## License
 
