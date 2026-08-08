@@ -1,0 +1,16 @@
+# 凭据：真实 key 永远不入库
+config.json
+*.key
+.env
+.env.*
+
+# 本地运行时产物
+output/
+input/
+__pycache__/
+*.pyc
+__MACOSX/
+.DS_Store
+
+# 本地运行时状态
+.qoder/settings.local.json

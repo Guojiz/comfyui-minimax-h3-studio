@@ -1,0 +1,15 @@
+{
+  "name": "ai-video-studio",
+  "displayName": "AI 视频工作室",
+  "version": "1.2.0",
+  "description": "Pure-API AI video production skill driving a local ComfyUI: DeepSeek prompt enhancement, gpt-image-2 first frame, and MiniMax H3 video generation with BYO API keys.",
+  "descriptionZh": "纯 API 的 AI 视频创作技能：驱动本机 ComfyUI 完成 DeepSeek 提示词增强 → gpt-image-2 首帧 → MiniMax H3 视频生成，全部使用用户自有 API key，不加载本地模型。",
+  "author": {
+    "name": "guojizheng"
+  },
+  "logo": "./assets/avatar.svg",
+  "keywords": ["qoder-plugin", "skill", "video-generation", "comfyui", "minimax-h3", "byo-api-key"],
+  "category": "developer-tools",
+  "tags": ["skill", "video", "comfyui"],
+  "skills": "./skills/"
+}
