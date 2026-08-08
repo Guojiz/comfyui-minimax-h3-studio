@@ -1,22 +1,23 @@
 # AI 视频工作室（ai-video-studio）
 
 一个 Qoder 插件，把「一句话 → 成片」的纯 API 视频流水线封装成 Agent Skill：
-**DeepSeek 提示词增强 → gpt-image-2 首帧生图 → MiniMax H3 视频生成**。
+**提示词增强 → 首帧生图 → 视频生成**。
 全部走用户自有 API key，不加载任何本地模型（无 GPU 也能跑，Mac/轻薄本友好）。
 
 > [English](README.md)
 
 ## 效果展示
 
-首帧由 gpt-image-2 生成，再由 MiniMax H3 动效化（端到端约 4 分钟）：
+先出首帧图，再动效化为视频（端到端约 4 分钟）：
 
 ![样例首帧](examples/sample-first-frame.png)
 
 ▶ 观看：[`examples/sample-video.mp4`](examples/sample-video.mp4)
 
-> **与已有方案的差异**：社区现有 MiniMax H3 项目多为本地开源权重路线（需高端 GPU）
+> **与已有方案的差异**：社区现有同类项目多为本地开源权重路线（需高端 GPU）
 > 或仅做提示词构建；本项目是 **BYO API key 纯云端流水线 + Agent Skill 封装**，
-> 并把官方《H3 使用手册》的提示词公式与踩坑表固化进了知识库。
+> 并把官方《H3 使用手册》原文收进 `references/h3-manual.md`，公式与踩坑表固化在
+> `references/prompt-craft.md`，另附可直接套用的完整提示词模板 `references/prompt-templates.md`。
 
 ## 三种用法
 
@@ -31,7 +32,9 @@
 | 文件 | 说明 |
 |---|---|
 | `skills/ai-video-studio/SKILL.md` | 主技能：执行方式、提示词铁律、健康检查、成本纪律 |
-| `skills/ai-video-studio/references/prompt-craft.md` | 视频 Prompt 工程手册（已融合官方《MiniMax H3 使用手册》三段公式与踩坑表） |
+| `skills/ai-video-studio/references/prompt-craft.md` | 视频 Prompt 工程手册（官方公式与踩坑表精华） |
+| `skills/ai-video-studio/references/h3-manual.md` | 官方《H3 模型 - 使用手册》原文（飞书导出，正文未改动） |
+| `skills/ai-video-studio/references/prompt-templates.md` | 完整提示词模板：空白模板 + 三个可直接使用的完整范例 |
 | `skills/ai-video-studio/scripts/make-video.sh` | 一句话出片脚本（健康检查→参数注入→提交→轮询→自动打开产物） |
 | `assets/workflow_api_mzsj_video.json` | 三段式 API 格式工作流模板（脚本自带，自包含） |
 | `examples/workflows/` | 精选工作流库：16 个 API 格式 workflow，覆盖视频生成/首帧/放大/产品场景（已注明来源，见目录内 README） |
@@ -51,7 +54,7 @@
 
 - 技能与节点由作者在本地 Mac（ComfyUI v0.30.2 / Comfy Desktop 1.0.37）上开发并端到端验证
 - Prompt 方法论来源：官方《MiniMax H3 模型 - 使用手册》《MiniMax Design - 新手指南》
-  （飞书文档导出）+ MiniMax Design app 内置 agent-profiles 知识体系
+  （原文已收进 `references/`）+ MiniMax Design app 内置 agent-profiles 知识体系
 - Logo：本地生成的 SVG（无第三方素材）
 
 ## 已知限制 / 省略内容
@@ -76,4 +79,4 @@ agent 工具的真正价值在于拥有一定量现成、高质量的 workflow �
 
 ## License
 
-MIT（见 [LICENSE](LICENSE)）。API 服务（DeepSeek / mzsjai / huoshenai）的费率与条款以各官方为准。
+MIT（见 [LICENSE](LICENSE)）。上游 API 平台的费率与条款以各官方为准。

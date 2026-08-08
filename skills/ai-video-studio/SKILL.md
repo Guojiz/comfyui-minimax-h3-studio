@@ -13,8 +13,7 @@ description: >
 # AI Video Studio — 纯 API 视频创作技能
 
 本技能驱动用户本机的 ComfyUI（localhost:8188）三段式纯 API 流水线：
-DeepSeek v4-flash 提示词增强 → 火神 gpt-image-2 生图 → mzsjai MiniMax H3 视频生成。
-不加载任何本地模型，全部走用户自有 API key。
+提示词增强 → 首帧生图 → 视频生成。不加载任何本地模型，全部走用户自有 API key。
 
 ## 环境事实（已验证）
 
@@ -53,7 +52,8 @@ bash .qoder/skills/ai-video-studio/scripts/make-video.sh "雨夜霓虹街道，�
 
 ## 提示词工程（生成前必须应用）
 
-详细方法论见 `references/prompt-craft.md`（已融合官方《H3 使用手册》）。
+详细方法论见 `references/prompt-craft.md`；官方《H3 使用手册》原文在 `references/h3-manual.md`；
+可直接套用的完整提示词模板与范例在 `references/prompt-templates.md`。
 官方公式：`完整提示词 = 参考素材说明 + 核心创意 + 画面过程说明`。核心铁律：
 
 1. **素材引用**：有参考素材时用 `@图片N/@视频N` 编号并逐个写清用途（人物参考/动作参考/运镜参考/首帧尾帧…）；无素材时跳过该段
@@ -65,6 +65,20 @@ bash .qoder/skills/ai-video-studio/scripts/make-video.sh "雨夜霓虹街道，�
 7. **每条 prompt 末尾锁 Medium**：防介质漂移（如 `Medium: photoreal live-action footage`）
 8. **提交前过官方踩坑表**（prompt-craft.md 第三节）逐条自检
 
+## 完整提示词模板（先套用，再按需调整）
+
+写 prompt 不是从零造句：空白模板 + 三个可直接使用的完整范例（5 秒文生 / 首帧图生 / 15 秒品牌片）在 `references/prompt-templates.md`。本流水线直接可用示例：
+
+```
+清晨六点的海边小镇码头，一位穿卡其色风衣的中年男人站在木栈道尽头，手握一杯冒热气的咖啡，海鸥在他头顶盘旋。写实电影质感，冷色调，轻微胶片颗粒，一镜到底。
+
+0-5秒：大全景，男人背对镜头站在栈道尽头，海面晨雾弥漫，远处渔船灯光闪烁。镜头从栈道中段缓慢前推，掠过湿漉漉的木栏杆。男人没有转身，风衣下摆被海风吹动，他举起咖啡杯喝了一口。海鸥鸣叫，海浪拍打木桩的声音由远及近。台词无。
+
+Medium: photoreal live-action footage
+```
+
+生成前用模板对照检查：素材段（有则写）、核心创意四要素、shot 六项、介质锁定——缺一项就补上再提交。
+
 ## 服务健康检查（操作前）
 
 - `curl -s http://127.0.0.1:8188/object_info | grep MzsjVideoGenerate` 无结果 → 服务未启动或节点未加载，提示用户在 Comfy Desktop 重启实例
@@ -73,5 +87,5 @@ bash .qoder/skills/ai-video-studio/scripts/make-video.sh "雨夜霓虹街道，�
 
 ## 成本纪律
 
-每次完整流水线消耗 1 次 DeepSeek + 1 次生图 + 1 次视频额度。
+每次完整流水线消耗 1 次提示词增强 + 1 次生图 + 1 次视频额度。
 调试节点逻辑用最小任务；用户未确认前不重复提交相同任务。
