@@ -57,7 +57,8 @@ Medium: photoreal live-action footage
 
 ## 四、完整范例 C：15 秒品牌片（多参考素材，API 平台直调场景）
 
-> 当前 ComfyUI 流水线暂不支持素材上传；此模板用于支持多模态参考的 API 直调。素材按上传顺序编号，逐个写清用途。
+> 当前快速路径节点暂不支持素材上传；此模板用于未来支持多模态参考的 API 直调场景。
+> 素材按上传顺序编号，逐个写清用途。超过 15 秒或多镜头叙事先读 `long-video.md`。
 
 ```
 @图片1 是场景参考，用途：整体氛围、场景与胶片质感；@图片2 是人物参考（锁脸），用途：演员外形与服装；@图片3 是物体参考，用途：产品资产（瓶身、标签）。
@@ -78,3 +79,10 @@ Medium: photoreal live-action footage
 
 Medium: photoreal live-action footage
 ```
+
+## 五、交叉引用
+
+- 方法论、官方踩坑表与台词预算：`prompt-craft.md`
+- 完整生产流程与 Agent 决策点：`production-workflow.md`
+- 长视频分段规划与连续性锚定：`long-video.md`
+- 提交前与生成后的质量验收：`quality-control.md`

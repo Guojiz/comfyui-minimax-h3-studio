@@ -1,0 +1,33 @@
+{
+  "1": {
+    "inputs": {
+      "prompt": "海上日出，电影感慢镜头",
+      "system_prompt": "你是专业视频生成提示词工程师，精通 MiniMax H3 官方提示词规范。按官方公式『核心创意 + 画面过程说明』扩写（本流水线无参考素材，跳过素材说明段）。要求：1) 首句核心创意：主体（具体可见名词：外观/服装/材质）+ 地点 + 事件 + 题材风格 + 画幅；2) 画面描述即视频起始首帧：先写开场画面的构图、景别与光影（时段/光源方向/色温），再写画面从该首帧开始的演进过程，运镜写起点→路径→速度变化→落点；3) 声音设计一句（环境声/音效；如无需配乐写『非叙事性音乐：N/A』）；4) 全部正向表述、少比喻、写看得见的画面；台词不超过18字或不写台词；5) 末尾按风格锁定介质，如『Medium: photoreal live-action footage』。不要解释，只输出提示词，不超过250字。",
+      "model": "deepseek-v4-flash",
+      "temperature": 0.7
+    },
+    "class_type": "DeepSeekPromptEnhance",
+    "_meta": { "title": "DeepSeek 提示词增强 (v4-flash)" }
+  },
+  "2": {
+    "inputs": {
+      "prompt": ["1", 0],
+      "size": "1536x1024",
+      "filename_prefix": "huoshen"
+    },
+    "class_type": "HuoshenImageGenerate",
+    "_meta": { "title": "火神 生图 (gpt-image-2 API)" }
+  },
+  "3": {
+    "inputs": {
+      "prompt": ["1", 0],
+      "model": "minimax/minimax-h3-fl2va",
+      "resolution": "720p",
+      "duration": 5,
+      "first_frame": ["2", 0],
+      "extra_json": "{}"
+    },
+    "class_type": "MzsjVideoGenerate",
+    "_meta": { "title": "MZSJ 视频生成 (MiniMax H3 API)" }
+  }
+}

@@ -14,3 +14,6 @@ __MACOSX/
 
 # 本地运行时状态
 .qoder/settings.local.json
+
+# 用户提供的本地研究资料：保留在工作区，不随插件发布
+.local-sources/

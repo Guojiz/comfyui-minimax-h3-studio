@@ -1,0 +1,31 @@
+# 凭据：真实 key 永不提交
+config.json
+*.key
+.env
+.env.*
+
+# 大体积媒体：需要提交精选成品时用 git add -f
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.psd
+*.tif
+*.tiff
+*.wav
+*.mp3
+*.aac
+
+# 运行时记录：run-workflow.py 的提交内容与 history 响应
+runs/
+
+# 编辑与系统残留
+.DS_Store
+__MACOSX/
+Thumbs.db
+*.log

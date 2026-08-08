@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Video Studio"
+  short_description: "用 Agent、资产和 ComfyUI 完成可复用的视频生产流程"
+  default_prompt: "使用 $ai-video-studio 根据我的需求规划、生成并验收一条视频。"

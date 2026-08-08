@@ -1,11 +1,12 @@
 #!/bin/bash
 # make-video — 一句话出片（DeepSeek 扩写 → gpt-image-2 生图 → MiniMax H3 视频）
 # 用法: ./make-video.sh "雨夜霓虹街道，赛博朋克" [--duration 5] [--resolution 720p] [--size 1536x1024] [--no-open] [--dry-run]
+# 配套: ./init-project.sh 初始化项目；./run-workflow.py 通用提交/轮询 API 工作流
 set -euo pipefail
 
 SERVER="${COMFY_SERVER:-http://127.0.0.1:8188}"
-# 默认使用插件自带模板（scripts/ 上三级为插件根），可用 COMFY_WORKFLOW_TPL 覆盖
-WORKFLOW_TPL="${COMFY_WORKFLOW_TPL:-$(cd "$(dirname "$0")/../../.." && pwd)/assets/workflow_api_mzsj_video.json}"
+# 默认使用 Skill 自带模板，单独安装 Skill 时也可运行；可用 COMFY_WORKFLOW_TPL 覆盖。
+WORKFLOW_TPL="${COMFY_WORKFLOW_TPL:-$(cd "$(dirname "$0")/.." && pwd)/assets/workflow_api_mzsj_video.json}"
 PY="${COMFY_PYTHON:-$HOME/ComfyUI-Installs/ComfyUI/standalone-env/bin/python3.13}"
 [ -x "$PY" ] || PY=python3
 OUTPUT_DIR="${COMFY_OUTPUT_DIR:-$HOME/ComfyUI-Installs/ComfyUI/ComfyUI/output}"
@@ -30,7 +31,23 @@ done
 
 [ -z "$PROMPT" ] && echo "用法: make-video.sh \"你的视频描述\" [选项]" && exit 1
 
-# 健康检查；服务未运行时自动后台拉起并等待就绪（最长 120 秒）
+# 生成临时工作流（注入参数）；macOS mktemp 要求 X 在模板末尾，扩展名对 python 解析无影响
+TMP=$(mktemp /tmp/make-video-XXXXXX)
+trap 'rm -f "$TMP"' EXIT
+"$PY" - "$WORKFLOW_TPL" "$TMP" "$PROMPT" "$DURATION" "$RESOLUTION" "$SIZE" <<'EOF'
+import json, sys
+tpl, out, prompt, dur, res, size = sys.argv[1:7]
+wf = json.load(open(tpl))
+wf["1"]["inputs"]["prompt"] = prompt
+wf["2"]["inputs"]["size"] = size
+wf["3"]["inputs"]["duration"] = int(dur)
+wf["3"]["inputs"]["resolution"] = res
+json.dump(wf, open(out, "w"), ensure_ascii=False)
+EOF
+
+if [ "$DRY" = 1 ]; then echo "dry-run: 校验通过，未启动服务、未提交"; cat "$TMP"; exit 0; fi
+
+# 健康检查；仅真实提交时执行。服务未运行则自动后台拉起并等待就绪（最长 120 秒）。
 COMFY_ROOT="${COMFY_ROOT:-$HOME/ComfyUI-Installs/ComfyUI/ComfyUI}"
 if ! curl -s -m 5 "$SERVER/object_info" | grep -q "MzsjVideoGenerate"; then
   echo "⚠️ ComfyUI 未运行，正在自动拉起..."
@@ -49,21 +66,6 @@ if ! curl -s -m 5 "$SERVER/object_info" | grep -q "MzsjVideoGenerate"; then
   [ "$READY" = 1 ] || { echo "❌ 自动拉起超时，查看 $HOME/Library/Logs/comfyui-headless.log"; exit 2; }
   echo "✅ ComfyUI 已就绪"
 fi
-
-# 生成临时工作流（注入参数）；macOS mktemp 要求 X 在模板末尾，扩展名对 python 解析无影响
-TMP=$(mktemp /tmp/make-video-XXXXXX)
-"$PY" - "$WORKFLOW_TPL" "$TMP" "$PROMPT" "$DURATION" "$RESOLUTION" "$SIZE" <<'EOF'
-import json, sys
-tpl, out, prompt, dur, res, size = sys.argv[1:7]
-wf = json.load(open(tpl))
-wf["1"]["inputs"]["prompt"] = prompt
-wf["2"]["inputs"]["size"] = size
-wf["3"]["inputs"]["duration"] = int(dur)
-wf["3"]["inputs"]["resolution"] = res
-json.dump(wf, open(out, "w"), ensure_ascii=False)
-EOF
-
-if [ "$DRY" = 1 ]; then echo "dry-run: $TMP"; cat "$TMP"; exit 0; fi
 
 echo "🚀 提交任务：$PROMPT"
 "$PY" - "$SERVER" "$TMP" "$OUTPUT_DIR" "$OPEN" <<'EOF'

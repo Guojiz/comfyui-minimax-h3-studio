@@ -1,8 +1,8 @@
 # Curated Workflow Library / 精选工作流库
 
-A hand-picked set of 16 high-quality **API-format** ComfyUI workflows, organized to complement this project's pipeline: generate a strong first frame locally, produce video, then upscale or refine the result. All files are `/prompt`-ready JSON — suitable for scripting, batch runs, and agent-driven automation.
+A hand-picked set of 16 **API-format** ComfyUI workflows that form the technical workflow canvas of the AI Video Studio Agent Skill. The Agent handles planning, the Skill supplies process and prompt discipline, Assets provide reusable inputs, and these workflows execute. All files are `/prompt`-ready JSON: suitable for scripting, batch runs, agent-driven automation, and manual loading in the ComfyUI UI.
 
-中文：精选的 16 个 **API 格式** ComfyUI 工作流，与本项目流水线互补——本地做好首帧/素材，出片后再放大精修。全部为可直接走 `/prompt` 接口的 JSON，适合脚本化、批量化和 agent 自动化调用。
+中文：精选的 16 个 **API 格式** ComfyUI 工作流，是 AI Video Studio Agent Skill 的技术工作流画布——Agent 负责编排，Skill 提供流程与提示词纪律，资产提供可复用输入，这些 workflow 负责执行。全部为可直接走 `/prompt` 接口的 JSON，适合脚本化、批量、agent 自动化，也可在 ComfyUI UI 中手动加载。
 
 ## Categories / 分类
 
@@ -46,8 +46,21 @@ A hand-picked set of 16 high-quality **API-format** ComfyUI workflows, organized
 
 1. 用 ComfyUI Manager 安装 workflow 中缺失的自定义节点，并按需准备对应模型权重。
 2. 将 `LoadImage` / `LoadVideo` 节点的占位输入替换为你自己的素材。
-3. 通过 `/prompt` 接口提交（与本项目 `make-video.sh` 的调用方式一致），或在 UI 中加载。
+3. 提交执行，三选一：
+   - 通用脚本：`python3 skills/ai-video-studio/scripts/run-workflow.py <file>.json --project <project-dir> --set '1.inputs.prompt="..."' --dry-run`；去掉 `--dry-run` 即真实提交并轮询，run 记录在 `<project-dir>/runs/`
+   - 一键快速路径：`make-video.sh` 仍用于三段式一句话出片（见插件根 README）
+   - 直接 `POST /prompt`，或在 ComfyUI UI 中加载
 4. 详细依赖与 API 调用说明可参考上游仓库的 `docs/`。
+
+English:
+
+1. Install missing custom nodes with ComfyUI Manager and prepare the required model weights.
+2. Replace the placeholder inputs in `LoadImage` / `LoadVideo` nodes with your own material.
+3. Submit any of these ways:
+   - Generic script: `python3 skills/ai-video-studio/scripts/run-workflow.py <file>.json --project <project-dir> --set '1.inputs.prompt="..."' --dry-run`; drop `--dry-run` to submit and poll, with the run recorded under `<project-dir>/runs/`
+   - One-line quick path: `make-video.sh` remains available for the three-stage one-shot flow (see plugin root README)
+   - POST `/prompt` directly, or load the JSON in the ComfyUI UI
+4. For detailed dependencies and API notes, see the upstream repository's `docs/`.
 
 ## Attribution & license / 来源与许可
 
