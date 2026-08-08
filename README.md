@@ -29,10 +29,9 @@ Existing community projects either run **open weights locally**
 - **BYO API key, pure cloud pipeline** — works on any machine
 - **Agent Skill wrapper** — say "make a video about X" and the agent handles the rest
 - **Self-healing script** — auto-starts your ComfyUI backend if it's down
-- **Official prompt engineering baked in** — the vendor's official user manual ships in
-  `references/h3-manual.md`, with its prompt formula and pitfall checklist distilled into
-  `references/prompt-craft.md`, plus ready-to-use complete prompt templates in
-  `references/prompt-templates.md`
+- **Prompt engineering built in** — the vendor's official manual is distilled (not
+  re-hosted, it stays copyrighted with its owner) into `references/prompt-craft.md`,
+  plus ready-to-use complete prompt templates in `references/prompt-templates.md`
 
 ## Three ways to use it
 
@@ -67,8 +66,7 @@ Optional env overrides: `COMFY_SERVER`, `COMFY_WORKFLOW_TPL`, `COMFY_PYTHON`,
 | Path | What |
 |---|---|
 | `skills/ai-video-studio/SKILL.md` | The Agent Skill: execution modes, prompt rules, cost discipline |
-| `skills/.../references/prompt-craft.md` | Prompt engineering handbook (official formula + pitfall checklist) |
-| `skills/.../references/h3-manual.md` | Official vendor user manual (source document, shipped as-is) |
+| `skills/.../references/prompt-craft.md` | Prompt engineering handbook (official formula + pitfall checklist, distilled — no vendor docs re-hosted) |
 | `skills/.../references/prompt-templates.md` | Complete ready-to-use prompt templates + worked examples |
 | `skills/.../scripts/make-video.sh` | One-line video production script (self-healing) |
 | `assets/workflow_api_mzsj_video.json` | Three-stage API-format workflow template |

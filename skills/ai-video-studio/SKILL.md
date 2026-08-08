@@ -52,7 +52,7 @@ bash .qoder/skills/ai-video-studio/scripts/make-video.sh "雨夜霓虹街道，�
 
 ## 提示词工程（生成前必须应用）
 
-详细方法论见 `references/prompt-craft.md`；官方《H3 使用手册》原文在 `references/h3-manual.md`；
+详细方法论见 `references/prompt-craft.md`（官方手册要点已提炼于此，原文版权归原厂商、不随仓库分发）；
 可直接套用的完整提示词模板与范例在 `references/prompt-templates.md`。
 官方公式：`完整提示词 = 参考素材说明 + 核心创意 + 画面过程说明`。核心铁律：
 
@@ -82,7 +82,7 @@ Medium: photoreal live-action footage
 ## 服务健康检查（操作前）
 
 - `curl -s http://127.0.0.1:8188/object_info | grep MzsjVideoGenerate` 无结果 → 服务未启动或节点未加载，提示用户在 Comfy Desktop 重启实例
-- mzsjai.com 超时且 DNS 为 198.18.x.x → 用户代理软件掉线，提醒开代理，勿反复重试
+- 上游视频 API 超时且 DNS 为 198.18.x.x → 用户代理软件掉线，提醒开代理，勿反复重试
 - 同一参数失败 ≥3 次必须停下换策略或询问用户（anti-loop 纪律）
 
 ## 成本纪律
