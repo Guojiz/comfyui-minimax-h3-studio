@@ -1,0 +1,2 @@
+# Official MCP Python SDK; FastMCP and ToolAnnotations ship inside the mcp package.
+mcp>=1.0.0,<2.0.0

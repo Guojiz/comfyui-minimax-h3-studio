@@ -24,6 +24,7 @@ skills/ai-video-studio/
   scripts/init-project.sh    minimal durable project facts
   scripts/run-workflow.py    generic API workflow execution and factual run records
   scripts/workflow-doctor.py preflight node/resource checks
+  mcp/                       optional thin Codex-to-ComfyUI HTTP bridge
   assets/                     distributable templates, provider/profile, project template
 assets/comfyui-nodes/         ComfyUI custom nodes
 examples/workflows/           research policy; no unlicensed third-party JSON redistribution
@@ -53,6 +54,10 @@ python3 skills/ai-video-studio/scripts/run-workflow.py workflow.json \
 ```
 
 Removing `--dry-run` submits the workflow. These commands are deterministic internal tools, not the customer interface.
+
+Codex can expose the same registry, doctor, and runner through the optional STDIO bridge at
+`skills/ai-video-studio/mcp/comfyui_mcp.py`. See its `README.md` for installation and safety configuration. The bridge
+does not replace the agent, and live generation remains a write-approved tool action.
 
 ## Configuration and capability
 

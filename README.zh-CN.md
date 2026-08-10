@@ -22,6 +22,7 @@ skills/ai-video-studio/
   scripts/init-project.sh  创建轻量项目事实
   scripts/run-workflow.py  通用 API workflow 提交与客观 run 留痕
   scripts/workflow-doctor.py 运行前节点/资源体检
+  mcp/                     Codex 到 ComfyUI HTTP API 的可选薄桥接器
   assets/                   正式模板、provider/profile 和项目模板
 assets/comfyui-nodes/       ComfyUI 自定义节点
 examples/workflows/         第三方研究目录说明，不分发许可不明 JSON
@@ -50,6 +51,10 @@ python3 skills/ai-video-studio/scripts/run-workflow.py workflow.json \
 ```
 
 去掉 `--dry-run` 才提交。命令是内部确定性工具，不是客户入口。
+
+Codex 可通过 `skills/ai-video-studio/mcp/comfyui_mcp.py` 把同一套 registry、doctor 和 runner
+暴露为 STDIO MCP 工具。安装与安全配置见 `skills/ai-video-studio/mcp/README.md`；MCP 不替代 Agent，
+实际生成工具保持写操作审批。
 
 ## 配置与能力
 

@@ -1,14 +1,14 @@
 {
   "name": "ai-video-studio",
   "displayName": "AI 视频工作室",
-  "version": "2.2.0",
-  "description": "Video production Skill for existing agents: progressive visible outputs, reusable asset lineage, and ComfyUI workflow-as-code with user-provided API keys.",
-  "descriptionZh": "供现有 Agent 使用的视频生产 Skill：根据客户反馈渐进产出，管理可复用资产来源，并以 ComfyUI workflow-as-code 执行；使用用户自有 API key。",
+  "version": "2.3.0",
+  "description": "Video production Skill for existing agents: progressive visible outputs, reusable asset lineage, and ComfyUI workflow-as-code with an optional Codex MCP bridge.",
+  "descriptionZh": "供现有 Agent 使用的视频生产 Skill：根据客户反馈渐进产出，管理可复用资产来源，以 ComfyUI workflow-as-code 执行，并可选接入 Codex MCP。",
   "author": {
     "name": "guojizheng"
   },
   "logo": "./assets/avatar.svg",
-  "keywords": ["qoder-plugin", "skill", "video-production", "comfyui", "agent-skill", "workflows", "assets", "byo-api-key"],
+  "keywords": ["qoder-plugin", "skill", "video-production", "comfyui", "mcp", "agent-skill", "workflows", "assets", "byo-api-key"],
   "category": "developer-tools",
   "tags": ["skill", "video", "comfyui"],
   "skills": "./skills/"

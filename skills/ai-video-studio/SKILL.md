@@ -92,6 +92,11 @@ python3 scripts/run-workflow.py <workflow.json> \
 去掉 `--dry-run` 才会提交。`run-workflow.py` 是 Agent 内部的确定性适配工具，不是用户产品入口。
 它保存实际 workflow、history、run 状态和输出；需要关联镜头时可选用 `--shot`、`--iteration`。
 
+Codex 配置了随 Skill 提供的 `mcp/comfyui_mcp.py` 时，优先通过 MCP 的 `list_workflows`、
+`inspect_workflow`、`doctor` 和 `run_workflow` 使用这些相同工具。MCP 只是 ComfyUI HTTP API 与现有
+脚本的薄适配层，不负责创意规划、资产审批或状态机。先用 `dry_run=true`；只有客户已明确要求生成时
+才允许实际提交。
+
 正式库中的每个 workflow 必须声明用途、输入输出、依赖、provider/profile、来源、许可和验证状态。
 项目修改版放项目 `workflows/`；许可或验证不明的外部 workflow 只能作为本地研究材料，不能冒充正式能力。
 详情见 `references/comfyui-workflows.md`。
