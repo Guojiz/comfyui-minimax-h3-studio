@@ -70,10 +70,20 @@ enters the public verified library only after its redistribution license, depend
 
 ## Verification scope
 
-Validated: Skill structure, Shell/Python/JSON, minimal project initialization, runner dry-run/mock paths, workflow doctor,
-and live ComfyUI node/enum preflight for the bundled text template. The `/v1/videos` adapter payload/download behavior
-was mock-validated against the current contract supplied by the user, but no new paid generation ran through this exact
-template, so its manifest says `dry-run`, not end-to-end `live-tested`.
+Validated by automated tests: Skill structure, Shell/Python/JSON, minimal project initialization, runner dry-run/mock
+paths, workflow doctor, and the MCP lifecycle (instance resolution/locking, submit/status, idempotency, queue/cancel,
+download with sha256, upload with manifest bindings). The zero-model smoke workflow was **live-tested** end-to-end on a
+real ComfyUI (upload → submit → status → download) and is kept as a repeatable fixture.
+
+Real production evidence provided by the operator: the remote GPU instance has successfully generated many videos
+through this stack, so video-model workflows are in routine use even though Codex itself did not re-run a paid
+generation during this work. Keep that distinction explicit in release notes.
+
+Long-video support is an **agent-guided editing workflow**: segment planning, continuity facts, QC, rough cuts, and
+approved-only delivery are decisions the agent makes with the customer, executed by deterministic scripts
+(`media-probe.py`, `rough-cut.py`, `deliver.py`) and FFmpeg. The scripts are unit-tested with mocks; the full
+multi-segment fixture acceptance has not been run, so long-video stays
+`design documented, execution unverified` until that evidence exists.
 
 ## Install
 

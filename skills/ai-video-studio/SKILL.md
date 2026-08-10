@@ -151,6 +151,19 @@ FFmpeg 后期与 approved-only 交付按 `references/post-production.md` 执行�
 粗剪自动版本化，交付只处理 approved 清单并生成 `delivery.json`。当前长视频为
 `long-video: design documented, execution unverified`，不得冒充已验证能力。
 
+### 剪辑是 Agent 指导的工作
+
+长视频的真正难点是剪辑决定，不是单段生成。工具只执行，不替 Agent 决定：
+
+- Agent 决定拆段粒度、每段的起点/落点、转场与声音策略，并把这些写进 edit plan/EDL。
+- 拿到候选先做接缝验收：相邻两段的末状态与起点是否连续，主体/场景/光照锚点是否成立；
+  接不上时只重做接缝附近，不整片重抽。
+- Agent 先做粗剪判断节奏（钩子、推进、转折、收尾），再决定补镜、返工或修改计划；
+  `rough-cut.py` 只负责规范化与拼接，版本化保护旧粗剪。
+- `approved` 只由 Agent 依据客户反馈认定，写入 `assets.md`；`deliver.py` 只复制清单内
+  approved 文件，绝不替 Agent 判断最终候选。
+- 每段生成都关联 run、workflow、实例与参考资产；成片必须可回溯到这些事实。
+
 按需读取 `references/quality-control.md`、`references/rework.md` 和 `references/long-video.md`。
 创作质量门见 `references/creative-gates.md`；确定性后期与交付见 `references/post-production.md`。
 
