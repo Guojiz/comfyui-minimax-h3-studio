@@ -22,3 +22,5 @@
 - 资产状态见 `assets.md`。
 - 只把会稳定约束后续工作的决定写入 `decisions.md`。
 - 工作流文件按需放入 `workflows/`；其他目录在工作需要出现时再创建。
+- ComfyUI 实例锁定在 `.ai-video-studio/instance.lock.json`，选择结果同步记入
+  `decisions.md`；所有正式 run 都使用该实例。

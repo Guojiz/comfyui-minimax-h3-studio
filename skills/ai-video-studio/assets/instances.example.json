@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "instances": [
+    {
+      "instance_id": "local-a",
+      "name": "Local ComfyUI",
+      "server": "http://127.0.0.1:8188"
+    },
+    {
+      "instance_id": "remote-b",
+      "name": "Remote GPU",
+      "server": "https://comfy.example:8443",
+      "auth_env": "COMFY_AUTH_TOKEN",
+      "notes": "认证只放在本机环境变量或忽略文件中"
+    }
+  ]
+}

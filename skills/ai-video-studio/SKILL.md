@@ -100,6 +100,24 @@ Codex 配置了随 Skill 提供的 `mcp/comfyui_mcp.py` 时，优先通过 MCP �
 `--server` 或 `COMFY_SERVER`），任何回退都要写入 run 记录并说明原因，禁止静默落到
 `127.0.0.1:8188`。已有同名 `runs/<run-name>` 记录受保护，不允许覆盖。
 
+实例与任务流程：
+
+1. 项目开始时用 `list_instances` 查看 catalog；只有一个实例时自动选择但必须报告，多个实例时
+   用 `select_instance` 让客户选择并锁定到项目，选择结果写入 `decisions.md`。
+2. 正式生成用 `submit_workflow`（立即返回 `run_id`/`prompt_id`/`status`），不要用同步阻塞工具。
+3. 用 `get_run_status` 按已有 `prompt_id` 查询，禁止重复提交；`instance_unreachable` 与
+   `monitoring_timeout` 不是失败，接口恢复后按同一 ID 补查。
+4. 完成后用 `download_artifacts` 把产物带哈希与来源保存进项目；`approved` 仍由 Agent 依据客户
+   反馈判断并写入 `assets.md`。
+5. 需要取消时用 `cancel_run`；运行中任务若后端只能全局 interrupt，必须如实报告 unsupported，
+   不得冒充精确取消。
+6. H3 参考图用 `upload_asset(..., authorized=true, workflow_id=..., semantic_input="reference_image")`
+   上传并按 manifest `bindings` 注入，不猜测节点编号；未获得授权不得上传敏感/肖像/版权素材。
+
+正式提交前按 `references/creative-gates.md` 做参考图、节奏/时长与提示词检查。多片段、粗剪、
+FFmpeg 后期与 approved-only 交付按 `references/post-production.md` 执行；当前在得到 fixture
+验证前保持 `long-video: design documented, execution unverified`。
+
 正式库中的每个 workflow 必须声明用途、输入输出、依赖、provider/profile、来源、许可和验证状态。
 项目修改版放项目 `workflows/`；许可或验证不明的外部 workflow 只能作为本地研究材料，不能冒充正式能力。
 详情见 `references/comfyui-workflows.md`。
@@ -128,7 +146,13 @@ Codex 配置了随 Skill 提供的 `mcp/comfyui_mcp.py` 时，优先通过 MCP �
 - 长视频按需要逐段推进：先验证角色/场景/风格锚点和关键镜头，再继续其他片段；不要把 `duration` 调长当成长片方案。
 - 字幕、响度、转场、封装等确定性问题优先使用 FFmpeg/剪辑工具，不浪费生成额度。
 
+后期脚本（`scripts/media-probe.py`、`scripts/rough-cut.py`、`scripts/deliver.py`）只在
+需要抽帧 QC、粗剪或交付时按需调用；本机无 FFmpeg 时它们给出可操作错误而不是自动安装。
+粗剪自动版本化，交付只处理 approved 清单并生成 `delivery.json`。当前长视频为
+`long-video: design documented, execution unverified`，不得冒充已验证能力。
+
 按需读取 `references/quality-control.md`、`references/rework.md` 和 `references/long-video.md`。
+创作质量门见 `references/creative-gates.md`；确定性后期与交付见 `references/post-production.md`。
 
 ## Skill 演进
 
@@ -147,6 +171,8 @@ Codex 配置了随 Skill 提供的 `mcp/comfyui_mcp.py` 时，优先通过 MCP �
 | `references/quality-control.md` | 检查候选、交付或决定返工 |
 | `references/rework.md` | 局部修改、版本比较和回滚 |
 | `references/long-video.md` | 多镜头或长视频 |
+| `references/creative-gates.md` | 正式提交前的参考图、节奏/时长、提示词检查 |
+| `references/post-production.md` | 抽帧 QC、粗剪、规范化、字幕/音频/交付 |
 | `references/skill-evolution.md` | 从实践生成或更新 Skill |
 | `references/codex.md` | Codex 宿主的工具映射 |
 | `references/qoder.md` | Qoder 兼容安装与路径 |

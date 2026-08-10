@@ -33,10 +33,20 @@ defaults (`http://127.0.0.1:8188` and the skill `assets/` directory).
 | Tool | Read-only | Behavior |
 | --- | --- | --- |
 | `health` | yes | GET `/system_stats`; returns a structured result when unreachable |
+| `list_instances` | yes | Lists the local instance catalog (`instance_id`, name, normalized server, auth_env) |
+| `check_instance(instance_id?, server?, timeout=8)` | yes | Health check for one catalog instance or an explicit server |
+| `select_instance(instance_id, project, decision_note?)` | no | Writes the project instance lock and returns a `decisions.md` line; Agent persists it |
+| `get_active_instance(project=".")` | yes | Reports the project's locked instance, if any |
 | `list_workflows` | yes | Lists registry JSON files plus companion manifest metadata |
 | `inspect_workflow(workflow_id)` | yes | Returns full workflow JSON, manifest, and node summary |
 | `doctor(workflow_id, offline=false, timeout=8)` | yes | Runs `scripts/workflow-doctor.py` |
 | `run_workflow(workflow_id, sets=[], dry_run=true, ...)` | no when `dry_run=false` | Runs `scripts/run-workflow.py`; default is dry-run validation only |
+| `submit_workflow(workflow_id, project, instance_id?, sets=[], ...)` | no | Submits and returns `run_id`/`prompt_id`/`status` immediately; never blocks polling; idempotent for active runs |
+| `get_run_status(run_id, project, instance_id?)` | yes | Queries `/queue` + `/history` for an existing run; never submits a new task |
+| `list_queue(instance_id?)` | yes | Snapshot of queue running/pending prompt ids |
+| `cancel_run(run_id, project, instance_id?)` | no | Deletes a queued run; reports `unsupported` for running tasks that would need a global interrupt |
+| `download_artifacts(run_id, project, instance_id?, target_dir?, overwrite=false)` | no | Saves completed-run artifacts with sha256 + source records into the project; never changes generation status |
+| `upload_asset(local_path, authorized=false, workflow_id?, semantic_input?, ...)` | no | Uploads one local image to `/upload/image`; requires explicit `authorized=true`; can return the manifest-bound `--set` spec |
 
 `run_workflow` is registered as non-read-only because `dry_run=false` submits to
 ComfyUI and writes run records under `<project>/runs/`.
@@ -57,9 +67,50 @@ Two safety rules are enforced by the runner and therefore by this bridge:
   always passes its configured server explicitly.
 - An existing `<project>/runs/<run-name>` directory is never overwritten; the
   runner fails with a `usage_error` and the caller must choose a new run name.
+- Without a resolved unique instance (catalog id, explicit server, or project
+  lock), `submit_workflow` refuses to POST `/prompt`; there is no silent target.
+- `get_run_status` never re-submits. `instance_unreachable` and
+  `monitoring_timeout` are non-terminal; only backend-confirmed states become
+  `completed`/`generation_failed`/`cancelled`.
 
 MZSJ-style nodes that publish `ui.video_paths`/`ui.video_filenames` are
 recognized and returned as `type: "mzsj"` artifacts with their source path.
+Provider task ids published as `ui.task_ids`/`ui.provider_task_ids` are written
+into the run record as soon as status is observed.
+
+## Instance catalog
+
+The catalog is a local JSON file, never the session:
+
+```json
+{
+  "version": 1,
+  "instances": [
+    {"instance_id": "local-a", "name": "Local A", "server": "http://127.0.0.1:8188"},
+    {"instance_id": "remote-b", "name": "Remote B", "server": "https://comfy.example:8443"}
+  ]
+}
+```
+
+Default location: `~/.config/ai-video-studio/instances.json` (override with
+`COMFY_INSTANCES` or `--catalog`). Server URLs are normalized and must not embed
+credentials; auth stays in local env/ignored files. A single catalog instance is
+auto-selected but always reported; multiple instances require an explicit
+project selection via `select_instance`, persisted in
+`.ai-video-studio/instance.lock.json` plus a `decisions.md` line.
+
+## Semantic input bindings
+
+Manifests can declare a `bindings` map from semantic inputs to node fields, so
+the Agent never has to guess node ids:
+
+```json
+{"bindings": {"reference_image": "137.inputs.image", "prompt": "138.inputs.value"}}
+```
+
+`upload_asset(..., workflow_id=..., semantic_input="reference_image")` returns
+the exact `--set` spec to inject the uploaded server filename into the workflow.
+`list_workflows` surfaces `bindings` for every registered workflow.
 
 ## Registry format
 

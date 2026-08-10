@@ -75,6 +75,21 @@ python3 scripts/workflow-doctor.py <workflow.json>
 锁定实例地址。正式提交必须显式指定 `--server` 或 `COMFY_SERVER`，不会静默回退
 `127.0.0.1:8188`。已有同名 run 目录受保护，重复 `--run-name` 会报错而不是覆盖旧记录。
 
+实例先解析、后提交：没有唯一目标实例（catalog id、显式 server 或项目锁）就绝不 POST
+`/prompt`。catalog 是本地 JSON（`~/.config/ai-video-studio/instances.json` 或
+`COMFY_INSTANCES`）；单实例自动选择但必须显示，多实例由客户选择后由 Agent 写入
+`decisions.md`，机器记录在 `.ai-video-studio/instance.lock.json`。真实认证信息只引用本机
+环境变量或忽略文件，不得进入 catalog、workflow 或 Git。
+
+正式生成优先用 MCP 的 `submit_workflow`：它立即返回 `run_id`、`prompt_id`、实例与
+`submitted` 状态，不做同步轮询。之后用 `get_run_status` 按同一 `prompt_id` 查询
+`/queue` 与 `/history`，绝不重复提交。只有后端明确终态才写 `completed`、
+`generation_failed` 或 `cancelled`；`instance_unreachable` 与 `monitoring_timeout`
+都不是失败终态，接口恢复后按原 ID 补查。每次查询更新 `last_checked_at` 与
+`last_known_status`。幂等：提交前生成覆盖实例、workflow 哈希、语义输入、seed 与 intent
+的幂等键；同一活动键重复提交返回已有 run。客户明确要求“用相同参数再抽一次”时，必须换新
+intent/run ID。连接失败或监控超时绝不自动重提。
+
 ### 2. 复制到项目并 dry-run
 
 先把正式模板复制到项目 `workflows/`，再按项目修改。不要直接破坏公共模板。
@@ -89,6 +104,10 @@ python3 scripts/run-workflow.py <project>/workflows/example.json \
 `--set` 的值必须是 JSON；字符串需要双引号。dry-run 不启动服务、不提交、不写 run。确认后去掉
 `--dry-run`，脚本通过 `/prompt` 提交、轮询 `/history/<prompt_id>`，并保存实际 workflow、history、
 run 状态和产物清单。镜头标识和版本需要时使用 `--shot`、`--iteration`，不是所有任务必填。
+
+参考图走 `upload_asset(..., authorized=true, workflow_id=..., semantic_input="reference_image")`：
+上传到 `/upload/image` 后按 manifest `bindings` 返回注入用的 `--set`，Agent 不需要猜节点编号。
+未获得外部上传授权时不得上传敏感、肖像或版权素材。
 
 ### 3. 查看或人工接管
 

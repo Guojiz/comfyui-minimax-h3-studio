@@ -13,6 +13,13 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+try:
+    from . import instances as instances_mod
+    from . import run_mgmt as run_mgmt_mod
+except ImportError:  # allow direct script execution without package context
+    import instances as instances_mod
+    import run_mgmt as run_mgmt_mod
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
 DEFAULT_REGISTRY = SKILL_DIR / "assets"
@@ -149,6 +156,7 @@ def load_registry(registry_dir=None):
                 "license": meta.get("license"),
                 "source": meta.get("source"),
                 "distribution": meta.get("distribution"),
+                "bindings": meta.get("bindings"),
                 "inputs": meta.get("inputs"),
                 "outputs": meta.get("outputs"),
                 "required_nodes": meta.get("required_nodes"),
@@ -215,6 +223,68 @@ def tool_health(server=None):
             "endpoint": "/system_stats",
             "error": str(error),
         }
+
+
+def tool_list_instances(catalog_path=None):
+    try:
+        catalog = instances_mod.load_catalog(catalog_path)
+        return {
+            "ok": True,
+            "catalog": catalog["path"],
+            "count": len(catalog["instances"]),
+            "instances": [
+                {
+                    "instance_id": entry["instance_id"],
+                    "name": entry["name"],
+                    "server": entry["server"],
+                    "auth_env": entry["auth_env"],
+                    "notes": entry["notes"],
+                }
+                for entry in catalog["instances"]
+            ],
+        }
+    except ValueError as error:
+        raise _tool_error(str(error)) from error
+
+
+def tool_check_instance(instance_id=None, server=None, catalog_path=None, timeout=8):
+    return instances_mod.check_instance(
+        instance_id, server, catalog_path=catalog_path, timeout=timeout
+    )
+
+
+def tool_get_active_instance(project=None, catalog_path=None):
+    project = project or "."
+    lock = instances_mod.read_project_lock(project)
+    if lock is None:
+        return {
+            "ok": False,
+            "project": str(Path(project).resolve()),
+            "instance_id": None,
+            "server": None,
+            "lock": None,
+            "error": "project has no instance lock; select one first",
+        }
+    return {
+        "ok": True,
+        "project": str(Path(project).resolve()),
+        "instance_id": lock.get("instance_id"),
+        "server": lock.get("server"),
+        "lock": lock,
+    }
+
+
+def tool_select_instance(instance_id, project, catalog_path=None, decision_note=None):
+    entry = instances_mod.find_instance(instance_id, catalog_path)
+    if entry is None:
+        raise LookupError(f"instance_id {instance_id!r} not found in catalog")
+    lock = instances_mod.write_project_lock(project, entry, note=decision_note)
+    return {
+        "ok": True,
+        "project": str(Path(project).expanduser().resolve()),
+        "lock": lock,
+        "decision_line": instances_mod.decision_line(entry, f"catalog:{instance_id}"),
+    }
 
 
 def tool_list_workflows(registry_dir=None):
@@ -397,6 +467,276 @@ def tool_run_workflow(
     return outcome
 
 
+def tool_submit_workflow(
+    workflow_id,
+    registry_dir=None,
+    server=None,
+    instance_id=None,
+    catalog_path=None,
+    project=".",
+    sets=None,
+    run_name=None,
+    shot=None,
+    iteration=None,
+    seed=None,
+    intended_run=None,
+):
+    """Submit without blocking: run record + prompt id + status prepared/submitted."""
+    import uuid
+    from pathlib import Path as _Path
+
+    if sets is None:
+        sets = []
+    workflow_path = resolve_workflow(workflow_id, registry_dir)
+    workflow, error = _load_json(workflow_path)
+    if error:
+        raise ValueError(f"cannot read workflow {workflow_id}: {error}")
+    if not isinstance(workflow, dict):
+        raise ValueError(f"workflow {workflow_id} must be a JSON object")
+
+    record, source = instances_mod.resolve_instance(
+        instance_id, server, project, catalog_path
+    )
+    server_url = record["server"]
+    key = run_mgmt_mod.idempotency_key(
+        record["instance_id"], workflow, sets, seed, intended_run or "default"
+    )
+    run_id = run_name or f"run-{key}-{uuid.uuid4().hex[:6]}"
+    run_dir = _Path(project).expanduser() / "runs" / run_id
+    if run_dir.exists():
+        existing = run_mgmt_mod.read_run_meta(run_dir)
+        if existing.get("idempotency_key") == key:
+            return {
+                "ok": True,
+                "duplicate": True,
+                "run_id": run_id,
+                "prompt_id": existing.get("prompt_id"),
+                "status": existing.get("status", "unknown"),
+                "run_dir": str(run_dir),
+                "server": server_url,
+                "instance_id": record["instance_id"],
+                "message": "active run with the same idempotency key already exists",
+            }
+        raise ValueError(
+            f"run directory already exists and does not match this intent: {run_dir}"
+        )
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+    meta = {
+        "schema_version": 3,
+        "run_id": run_id,
+        "run_name": run_id,
+        "workflow_id": workflow_id,
+        "workflow_file": str(workflow_path),
+        "workflow_hash": run_mgmt_mod.workflow_hash(workflow, sets),
+        "sets": list(sets),
+        "instance_id": record["instance_id"],
+        "server": server_url,
+        "instance_source": source,
+        "shot_id": shot,
+        "iteration": iteration,
+        "seed": seed,
+        "intended_run": intended_run,
+        "idempotency_key": key,
+        "submitted_at": run_mgmt_mod.now_iso(),
+        "status": "prepared",
+        "artifacts": [],
+    }
+    run_mgmt_mod.save_json(run_dir / "workflow.json", workflow)
+    run_mgmt_mod.save_json(run_dir / "run.json", meta)
+
+    try:
+        payload = {"prompt": workflow}
+        response = run_mgmt_mod.http_json(
+            server_url + "/prompt", method="POST", payload=payload, timeout=30
+        )
+    except RuntimeError as error:
+        meta["status"] = "instance_unreachable"
+        meta["error"] = str(error)
+        run_mgmt_mod.save_json(run_dir / "run.json", meta)
+        return {
+            "ok": False,
+            "run_id": run_id,
+            "prompt_id": None,
+            "status": "instance_unreachable",
+            "run_dir": str(run_dir),
+            "server": server_url,
+            "instance_id": record["instance_id"],
+            "error": str(error),
+        }
+    prompt_id = response.get("prompt_id") if isinstance(response, dict) else None
+    if not prompt_id:
+        meta["status"] = "submit_error"
+        meta["error"] = "prompt response missing prompt_id"
+        run_mgmt_mod.save_json(run_dir / "run.json", meta)
+        return {
+            "ok": False,
+            "run_id": run_id,
+            "prompt_id": None,
+            "status": "submit_error",
+            "run_dir": str(run_dir),
+            "server": server_url,
+            "instance_id": record["instance_id"],
+            "error": meta["error"],
+        }
+    meta["prompt_id"] = prompt_id
+    meta["status"] = "submitted"
+    run_mgmt_mod.save_json(run_dir / "run.json", meta)
+    return {
+        "ok": True,
+        "run_id": run_id,
+        "prompt_id": prompt_id,
+        "status": "submitted",
+        "run_dir": str(run_dir),
+        "server": server_url,
+        "instance_id": record["instance_id"],
+        "artifacts": [],
+    }
+
+
+def tool_get_run_status(
+    run_id,
+    project=".",
+    server=None,
+    instance_id=None,
+    catalog_path=None,
+):
+    meta = run_mgmt_mod.read_run_meta(run_mgmt_mod.read_run_dir(project, run_id))
+    record, _ = instances_mod.resolve_instance(
+        instance_id, server, project, catalog_path
+    )
+    server_url = record["server"]
+    prompt_id = meta.get("prompt_id")
+    if not prompt_id:
+        return {
+            "ok": True,
+            "run_id": run_id,
+            "status": meta.get("status", "unknown"),
+            "server": server_url,
+            "prompt_id": None,
+            "message": "run has no prompt_id yet",
+        }
+    try:
+        status = run_mgmt_mod.status_for_prompt_id(server_url, prompt_id)
+    except RuntimeError as error:
+        run_mgmt_mod.write_status(project, run_id, "instance_unreachable", server_url)
+        return {
+            "ok": False,
+            "run_id": run_id,
+            "status": "instance_unreachable",
+            "prompt_id": prompt_id,
+            "server": server_url,
+            "error": str(error),
+        }
+    extra = {"prompt_id": prompt_id}
+    if status["entry"] is not None:
+        provider_task_id = run_mgmt_mod.derive_provider_task_id(status["entry"])
+        if provider_task_id:
+            extra["provider_task_id"] = provider_task_id
+        if status["status"] == "completed":
+            run_mgmt_mod.merge_artifacts_into_meta(meta, status["entry"])
+            if meta.get("artifacts"):
+                extra["artifacts"] = meta["artifacts"]
+    run_mgmt_mod.write_status(
+        project,
+        run_id,
+        status["status"],
+        server_url,
+        extra,
+    )
+    result = {
+        "ok": True,
+        "run_id": run_id,
+        "status": status["status"],
+        "prompt_id": prompt_id,
+        "server": server_url,
+        "queue_state": status["queue_state"],
+    }
+    if status["entry"] is not None:
+        result["entry"] = status["entry"]
+        provider_task_id = run_mgmt_mod.derive_provider_task_id(status["entry"])
+        if provider_task_id:
+            result["provider_task_id"] = provider_task_id
+    return result
+
+
+def tool_list_queue(instance_id=None, server=None, catalog_path=None):
+    record, _ = instances_mod.resolve_instance(instance_id, server, None, catalog_path)
+    return run_mgmt_mod.list_queue(record["instance_id"], record["server"])
+
+
+def tool_cancel_run(
+    run_id,
+    project=".",
+    server=None,
+    instance_id=None,
+    catalog_path=None,
+):
+    meta = run_mgmt_mod.read_run_meta(run_mgmt_mod.read_run_dir(project, run_id))
+    record, _ = instances_mod.resolve_instance(instance_id, server, project, catalog_path)
+    server_url = record["server"]
+    prompt_id = meta.get("prompt_id")
+    if not prompt_id:
+        return {"ok": False, "run_id": run_id, "error": "run has no prompt_id"}
+    try:
+        queue_payload = run_mgmt_mod.http_json(server_url + "/queue", timeout=10)
+    except RuntimeError as error:
+        return {"ok": False, "run_id": run_id, "prompt_id": prompt_id, "error": str(error)}
+    result = run_mgmt_mod.cancel_run(server_url, prompt_id, queue_payload)
+    if result.get("cancelled"):
+        run_mgmt_mod.write_status(project, run_id, "cancelled", server_url)
+    return result
+
+
+def tool_download_artifacts(
+    run_id,
+    project=".",
+    instance_id=None,
+    server=None,
+    catalog_path=None,
+    target_dir=None,
+    overwrite=False,
+):
+    record, _ = instances_mod.resolve_instance(instance_id, server, project, catalog_path)
+    return run_mgmt_mod.download_artifacts(
+        project, run_id, record, record["server"], target_dir, overwrite
+    )
+
+
+def tool_upload_asset(
+    local_path,
+    server=None,
+    instance_id=None,
+    catalog_path=None,
+    remote_name=None,
+    overwrite=False,
+    authorized=False,
+    workflow_id=None,
+    registry_dir=None,
+    semantic_input=None,
+):
+    if not authorized:
+        raise ValueError(
+            "upload requires explicit authorization; sensitive, portrait or "
+            "copyrighted material must not be uploaded without it"
+        )
+    record, _ = instances_mod.resolve_instance(instance_id, server, None, catalog_path)
+    result = run_mgmt_mod.upload_image(
+        record["server"], local_path, remote_name, overwrite
+    )
+    if workflow_id and semantic_input:
+        workflow_path = resolve_workflow(workflow_id, registry_dir)
+        manifest_path = workflow_path.with_name(f"{workflow_path.stem}.manifest.json")
+        manifest, error = _load_json(manifest_path)
+        if error:
+            raise ValueError(f"cannot read manifest for {workflow_id}: {error}")
+        specs = run_mgmt_mod.semantic_binding_sets(
+            manifest, {semantic_input: result["remote_name"]}
+        )
+        result["bind_specs"] = specs
+    return result
+
+
 def _tool_error(message):
     try:
         from mcp.server.fastmcp import ToolError
@@ -419,7 +759,7 @@ def _register_tool(mcp, fn, name, description, *, is_readonly):
     mcp.tool(name=name, description=description, annotations=annotations)(fn)
 
 
-def create_server(server=None, registry_dir=None):
+def create_server(server=None, registry_dir=None, catalog_path=None):
     from mcp.server.fastmcp import FastMCP
 
     server_url = normalize_server_url(server)
@@ -428,6 +768,33 @@ def create_server(server=None, registry_dir=None):
 
     def health() -> dict:
         return tool_health(server_url)
+
+    def list_instances() -> dict:
+        return tool_list_instances(catalog_path)
+
+    def check_instance(
+        instance_id: str | None = None,
+        server: str | None = None,
+        timeout: int = 8,
+    ) -> dict:
+        return tool_check_instance(
+            instance_id, server, catalog_path=catalog_path, timeout=timeout
+        )
+
+    def select_instance(
+        instance_id: str,
+        project: str,
+        decision_note: str | None = None,
+    ) -> dict:
+        try:
+            return tool_select_instance(
+                instance_id, project, catalog_path, decision_note
+            )
+        except (ValueError, LookupError) as error:
+            raise _tool_error(str(error)) from error
+
+    def get_active_instance(project: str = ".") -> dict:
+        return tool_get_active_instance(project, catalog_path)
 
     def list_workflows() -> dict:
         return tool_list_workflows(registry)
@@ -474,12 +841,145 @@ def create_server(server=None, registry_dir=None):
         except (ValueError, LookupError) as error:
             raise _tool_error(str(error)) from error
 
+    def submit_workflow(
+        workflow_id: str,
+        project: str = ".",
+        instance_id: str | None = None,
+        sets: list[str] | None = None,
+        run_name: str | None = None,
+        shot: str | None = None,
+        iteration: str | None = None,
+        seed: str | None = None,
+        intended_run: str | None = None,
+    ) -> dict:
+        try:
+            return tool_submit_workflow(
+                workflow_id,
+                registry,
+                server_url,
+                instance_id,
+                catalog_path,
+                project,
+                sets,
+                run_name,
+                shot,
+                iteration,
+                seed,
+                intended_run,
+            )
+        except (ValueError, LookupError) as error:
+            raise _tool_error(str(error)) from error
+
+    def get_run_status(
+        run_id: str,
+        project: str = ".",
+        instance_id: str | None = None,
+    ) -> dict:
+        try:
+            return tool_get_run_status(
+                run_id, project, server_url, instance_id, catalog_path
+            )
+        except (ValueError, LookupError) as error:
+            raise _tool_error(str(error)) from error
+
+    def list_queue(instance_id: str | None = None) -> dict:
+        try:
+            return tool_list_queue(instance_id, server_url, catalog_path)
+        except (ValueError, LookupError) as error:
+            raise _tool_error(str(error)) from error
+
+    def cancel_run(
+        run_id: str,
+        project: str = ".",
+        instance_id: str | None = None,
+    ) -> dict:
+        try:
+            return tool_cancel_run(
+                run_id, project, server_url, instance_id, catalog_path
+            )
+        except (ValueError, LookupError) as error:
+            raise _tool_error(str(error)) from error
+
+    def download_artifacts(
+        run_id: str,
+        project: str = ".",
+        instance_id: str | None = None,
+        target_dir: str | None = None,
+        overwrite: bool = False,
+    ) -> dict:
+        try:
+            return tool_download_artifacts(
+                run_id,
+                project,
+                instance_id,
+                server_url,
+                catalog_path,
+                target_dir,
+                overwrite,
+            )
+        except (ValueError, LookupError) as error:
+            raise _tool_error(str(error)) from error
+
+    def upload_asset(
+        local_path: str,
+        instance_id: str | None = None,
+        remote_name: str | None = None,
+        overwrite: bool = False,
+        authorized: bool = False,
+        workflow_id: str | None = None,
+        semantic_input: str | None = None,
+    ) -> dict:
+        try:
+            return tool_upload_asset(
+                local_path,
+                server_url,
+                instance_id,
+                catalog_path,
+                remote_name,
+                overwrite,
+                authorized,
+                workflow_id,
+                registry,
+                semantic_input,
+            )
+        except (ValueError, LookupError) as error:
+            raise _tool_error(str(error)) from error
+
     _register_tool(
         mcp,
         health,
         "health",
         "Read-only ComfyUI health check. Returns /system_stats when the server "
         "is reachable and a structured error result otherwise.",
+        is_readonly=True,
+    )
+    _register_tool(
+        mcp,
+        list_instances,
+        "list_instances",
+        "Read-only list of configured ComfyUI instances from the local catalog.",
+        is_readonly=True,
+    )
+    _register_tool(
+        mcp,
+        check_instance,
+        "check_instance",
+        "Read-only health check for one instance (by catalog id or explicit server).",
+        is_readonly=True,
+    )
+    _register_tool(
+        mcp,
+        select_instance,
+        "select_instance",
+        "Lock an instance for a project by writing the project instance lock; "
+        "returns a decision line for decisions.md. Agent persists human decisions.",
+        is_readonly=False,
+    )
+    _register_tool(
+        mcp,
+        get_active_instance,
+        "get_active_instance",
+        "Read-only report of the project's locked instance, if any.",
         is_readonly=True,
     )
     _register_tool(
@@ -515,6 +1015,52 @@ def create_server(server=None, registry_dir=None):
         "because it submits and writes run records.",
         is_readonly=False,
     )
+    _register_tool(
+        mcp,
+        submit_workflow,
+        "submit_workflow",
+        "Submit a registered workflow and return immediately with run_id, "
+        "prompt_id and status; never blocks polling. Idempotent for active runs.",
+        is_readonly=False,
+    )
+    _register_tool(
+        mcp,
+        get_run_status,
+        "get_run_status",
+        "Query status for an existing run by prompt id; never submits a new task.",
+        is_readonly=True,
+    )
+    _register_tool(
+        mcp,
+        list_queue,
+        "list_queue",
+        "Read-only snapshot of the instance queue (running and pending prompt ids).",
+        is_readonly=True,
+    )
+    _register_tool(
+        mcp,
+        cancel_run,
+        "cancel_run",
+        "Cancel a queued run; reports unsupported for running tasks that would "
+        "require a global interrupt.",
+        is_readonly=False,
+    )
+    _register_tool(
+        mcp,
+        download_artifacts,
+        "download_artifacts",
+        "Download completed-run artifacts into the project with sha256 and "
+        "source records; never changes generation status.",
+        is_readonly=False,
+    )
+    _register_tool(
+        mcp,
+        upload_asset,
+        "upload_asset",
+        "Upload one local image to the instance /upload/image; requires "
+        "authorized=true and records sha256.",
+        is_readonly=False,
+    )
     return mcp
 
 
@@ -537,6 +1083,14 @@ def main(argv=None):
         ),
     )
     parser.add_argument(
+        "--catalog",
+        default=None,
+        help=(
+            f"instance catalog JSON file (default: env {INSTANCES_ENV} "
+            f"or {instances_mod.DEFAULT_CATALOG})"
+        ),
+    )
+    parser.add_argument(
         "--transport",
         default="stdio",
         choices=("stdio",),
@@ -544,7 +1098,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
     try:
-        mcp = create_server(args.server, args.registry)
+        mcp = create_server(args.server, args.registry, args.catalog)
     except ValueError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

@@ -44,6 +44,54 @@ class ServerUrlTests(unittest.TestCase):
             bridge.normalize_server_url("ftp://127.0.0.1:8188")
 
 
+class InstanceToolTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.catalog = Path(self.tmp.name) / "instances.json"
+        self.catalog.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "instances": [
+                        {
+                            "instance_id": "local-a",
+                            "name": "Local A",
+                            "server": "http://127.0.0.1:8188",
+                        },
+                        {
+                            "instance_id": "remote-b",
+                            "name": "Remote B",
+                            "server": "https://comfy.example:8443",
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def test_list_instances(self):
+        result = bridge.tool_list_instances(str(self.catalog))
+        self.assertEqual(result["count"], 2)
+        self.assertEqual(result["instances"][1]["instance_id"], "remote-b")
+
+    def test_select_and_get_active_instance(self):
+        project = Path(self.tmp.name) / "proj"
+        selected = bridge.tool_select_instance("local-a", str(project), str(self.catalog))
+        self.assertTrue(selected["ok"])
+        active = bridge.tool_get_active_instance(str(project), str(self.catalog))
+        self.assertEqual(active["instance_id"], "local-a")
+        self.assertEqual(active["server"], "http://127.0.0.1:8188")
+        lock = json.loads(
+            (project / ".ai-video-studio" / "instance.lock.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(lock["instance_id"], "local-a")
+
+    def test_get_active_instance_without_lock(self):
+        result = bridge.tool_get_active_instance(str(Path(self.tmp.name) / "none"), str(self.catalog))
+        self.assertFalse(result["ok"])
+
+
 class RegistryTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -323,14 +371,31 @@ class ServerRegistrationTests(unittest.TestCase):
         }
         return mock.patch.dict(sys.modules, modules)
 
-    def test_registers_five_tools_with_tool_annotations(self):
+    def test_registers_all_tools_with_tool_annotations(self):
         with self.install_fake_mcp():
             server = bridge.create_server(
                 server="http://127.0.0.1:8188", registry_dir=str(self.registry)
             )
         names = [entry[0] for entry in server.registered]
         self.assertEqual(
-            names, ["health", "list_workflows", "inspect_workflow", "doctor", "run_workflow"]
+            names,
+            [
+                "health",
+                "list_instances",
+                "check_instance",
+                "select_instance",
+                "get_active_instance",
+                "list_workflows",
+                "inspect_workflow",
+                "doctor",
+                "run_workflow",
+                "submit_workflow",
+                "get_run_status",
+                "list_queue",
+                "cancel_run",
+                "download_artifacts",
+                "upload_asset",
+            ],
         )
         for name, _, annotations, _ in server.registered:
             self.assertIsInstance(annotations, FakeToolAnnotations)
@@ -346,10 +411,20 @@ class ServerRegistrationTests(unittest.TestCase):
             flags,
             {
                 "health": (True, False, True),
+                "list_instances": (True, False, True),
+                "check_instance": (True, False, True),
+                "select_instance": (False, False, False),
+                "get_active_instance": (True, False, True),
                 "list_workflows": (True, False, True),
                 "inspect_workflow": (True, False, True),
                 "doctor": (True, False, True),
                 "run_workflow": (False, False, False),
+                "submit_workflow": (False, False, False),
+                "get_run_status": (True, False, True),
+                "list_queue": (True, False, True),
+                "cancel_run": (False, False, False),
+                "download_artifacts": (False, False, False),
+                "upload_asset": (False, False, False),
             },
         )
 
