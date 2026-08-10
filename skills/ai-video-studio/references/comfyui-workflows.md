@@ -71,6 +71,10 @@ python3 scripts/workflow-doctor.py <workflow.json>
 退出码：`0` 结构/实例检查通过；`1` JSON 错误；`2` ComfyUI 不可达；`3` 缺节点或枚举资源。
 `--offline` 只检查 API JSON 结构。体检通过不是付费端到端证明。
 
+执行实例必须是显式决策：MCP 已配置实例时优先用 MCP；MCP 不可用时必须显式传入同一
+锁定实例地址。正式提交必须显式指定 `--server` 或 `COMFY_SERVER`，不会静默回退
+`127.0.0.1:8188`。已有同名 run 目录受保护，重复 `--run-name` 会报错而不是覆盖旧记录。
+
 ### 2. 复制到项目并 dry-run
 
 先把正式模板复制到项目 `workflows/`，再按项目修改。不要直接破坏公共模板。

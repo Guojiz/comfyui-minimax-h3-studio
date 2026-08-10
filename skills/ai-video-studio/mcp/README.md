@@ -41,13 +41,37 @@ defaults (`http://127.0.0.1:8188` and the skill `assets/` directory).
 `run_workflow` is registered as non-read-only because `dry_run=false` submits to
 ComfyUI and writes run records under `<project>/runs/`.
 
+When `dry_run=false`, `run_workflow` returns structured run facts instead of raw
+stdout, including `run_id`, `run_name`, `run_dir`, `prompt_id`, `status`,
+`server`, `artifacts`, and a full `run_facts` object. The underlying runner is
+invoked with `--json` so the bridge never requires parsing human-readable
+output. Statuses follow the run contract: `prepared`, `submitted`,
+`completed`, `generation_failed`, `instance_unreachable`, `monitoring_timeout`,
+and `usage_error`; only backend-confirmed terminal states count as
+`completed`/`generation_failed`.
+
+Two safety rules are enforced by the runner and therefore by this bridge:
+
+- A real submission (not dry-run) must have an explicit instance via `--server`
+  or `COMFY_SERVER`; there is no silent fallback to `127.0.0.1:8188`. The bridge
+  always passes its configured server explicitly.
+- An existing `<project>/runs/<run-name>` directory is never overwritten; the
+  runner fails with a `usage_error` and the caller must choose a new run name.
+
+MZSJ-style nodes that publish `ui.video_paths`/`ui.video_filenames` are
+recognized and returned as `type: "mzsj"` artifacts with their source path.
+
 ## Registry format
 
 Every `*.json` file directly inside the registry directory is a workflow.
 Optional companion manifests are named `<workflow>.manifest.json` and provide
 metadata such as `id`, `purpose`, `provider`, `inputs`, `outputs`,
-`required_nodes`, and `verified`. The manifest `id` is used as the workflow id
-when present; otherwise the filename stem is used.
+`required_nodes`, `verified`, `license`, `source`, and `distribution`. The
+manifest filename must match the workflow filename stem exactly (for example
+`minimax-h3-r2v-0.7mp.json` pairs with `minimax-h3-r2v-0.7mp.manifest.json`);
+a mismatched name leaves `manifest_file: null` and drops the metadata. The
+manifest `id` is used as the workflow id when present; otherwise the filename
+stem is used.
 
 Workflow ids are restricted to alphanumeric characters plus `.`, `_`, and `-`,
 and resolved paths are checked to stay inside the registry directory.

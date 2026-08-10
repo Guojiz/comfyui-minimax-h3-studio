@@ -37,6 +37,8 @@ def build_parser():
         epilog=(
             "退出码：0 成功；1 工作流校验错误；2 命令行或服务器/网络错误；"
             "3 工作流执行错误；4 轮询超时。\n"
+            "正式提交必须显式指定实例（--server 或 COMFY_SERVER），不会静默回退 localhost；"
+            "已有同名 run 目录不会覆盖。\n"
             "--set 示例：--set '1.inputs.prompt=\"雨夜街道\"' --set '3.inputs.duration=5'"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -55,8 +57,16 @@ def build_parser():
     )
     parser.add_argument(
         "--server",
-        default=os.environ.get("COMFY_SERVER", DEFAULT_SERVER),
-        help="ComfyUI 地址（默认 %s，可用 COMFY_SERVER 覆盖）" % DEFAULT_SERVER,
+        default=None,
+        help=(
+            "ComfyUI 地址；真实提交必须显式提供（CLI、COMFY_SERVER 或项目锁定的 "
+            "localhost 实例），不允许静默回退到默认地址"
+        ),
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="stdout 只输出一个结构化 JSON 结果对象，人类可读信息走 stderr",
     )
     parser.add_argument("--timeout", type=int, default=900, help="轮询总超时秒数（默认 900）")
     parser.add_argument("--poll-interval", type=int, default=5, help="轮询间隔秒数（默认 5）")
@@ -165,6 +175,47 @@ def now_iso():
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
+def emit(args, **fields):
+    """Write progress facts; stdout carries only the final JSON object in --json mode."""
+    if args.json:
+        print(json.dumps(fields, ensure_ascii=False), file=sys.stderr)
+    else:
+        text = fields.get("message")
+        if text:
+            print(text, file=sys.stderr)
+
+
+def emit_final(args, result):
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        text = result.get("message")
+        if text:
+            print(text)
+        for line in result.get("detail_lines", []):
+            print(line)
+
+
+def resolve_server(args):
+    """Explicit server wins; env COMFY_SERVER is explicit configuration, never a silent default."""
+    if args.server:
+        return args.server.strip().rstrip("/")
+    env_server = os.environ.get("COMFY_SERVER")
+    if env_server:
+        return env_server.strip().rstrip("/")
+    return None
+
+
+def require_submit_server(args, server):
+    """Real submissions need an explicit instance; localhost must never be an implicit fallback."""
+    if server:
+        return server
+    raise UsageError(
+        "正式提交必须显式指定 ComfyUI 实例（--server 或 COMFY_SERVER 或项目锁定的 "
+        "localhost 实例）；当前没有显式实例，已停止，未向默认地址提交"
+    )
+
+
 def normalize_run_name(name):
     if name in ("", ".", ".."):
         raise UsageError("--run-name 不能为空、. 或 ..")
@@ -266,6 +317,41 @@ def extract_artifacts(outputs):
     return artifacts
 
 
+def extract_mzsj_artifacts(outputs):
+    """MZSJ nodes publish videos as ui.video_paths/video_filenames; turn them into artifacts."""
+    artifacts = []
+    seen = set()
+    for node_id, out in outputs.items():
+        if not isinstance(out, dict):
+            continue
+        ui = out.get("ui")
+        if not isinstance(ui, dict):
+            continue
+        paths = ui.get("video_paths")
+        names = ui.get("video_filenames")
+        if not isinstance(paths, list) or not isinstance(names, list):
+            continue
+        for path, name in zip(paths, names):
+            if not isinstance(path, str) or not isinstance(name, str):
+                continue
+            key = (path, name)
+            if key in seen:
+                continue
+            seen.add(key)
+            artifacts.append(
+                {
+                    "node": node_id,
+                    "kind": "video",
+                    "filename": name,
+                    "subfolder": "",
+                    "type": "mzsj",
+                    "source_path": path,
+                    "view_url": None,
+                }
+            )
+    return artifacts
+
+
 def collect_ui(outputs):
     lines = []
     skipped = {"images", "gifs", "videos", "audio"}
@@ -284,17 +370,6 @@ def collect_ui(outputs):
     return lines
 
 
-def view_url(server, artifact):
-    query = urllib.parse.urlencode(
-        {
-            "filename": artifact["filename"],
-            "subfolder": artifact["subfolder"],
-            "type": artifact["type"],
-        }
-    )
-    return f"{server}/view?{query}"
-
-
 def run(args):
     workflow = load_workflow(args.workflow)
     apply_sets(workflow, args.set)
@@ -309,11 +384,34 @@ def run(args):
     )
     run_dir = Path(args.project).expanduser() / "runs" / run_name
     if args.dry_run:
-        print("dry-run: 校验通过，未提交、未写文件")
-        print(f"将保存到: {run_dir}")
-        print("提交的 workflow:")
-        print(json.dumps(workflow, ensure_ascii=False, indent=2))
+        emit_final(
+            args,
+            {
+                "ok": True,
+                "exit_code": 0,
+                "dry_run": True,
+                "run_id": None,
+                "run_name": run_name,
+                "run_dir": str(run_dir),
+                "prompt_id": None,
+                "status": "prepared",
+                "server": resolve_server(args),
+                "workflow_id": Path(args.workflow).stem,
+                "message": "dry-run: 校验通过，未提交、未写文件",
+                "detail_lines": [
+                    f"将保存到: {run_dir}",
+                    "提交的 workflow:",
+                    json.dumps(workflow, ensure_ascii=False, indent=2),
+                ],
+            },
+        )
         return 0
+
+    if run_dir.exists():
+        raise UsageError(
+            f"run 目录已存在: {run_dir}；旧 run 记录受保护，请使用新的 run-name"
+        )
+    server = require_submit_server(args, resolve_server(args))
 
     run_dir.mkdir(parents=True, exist_ok=True)
     meta = {
@@ -321,50 +419,113 @@ def run(args):
         "run_name": run_name,
         "shot_id": shot_id,
         "iteration": iteration,
-        "server": args.server,
+        "server": server,
+        "server_source": (
+            "cli"
+            if args.server
+            else "env:COMFY_SERVER"
+            if os.environ.get("COMFY_SERVER")
+            else "unknown"
+        ),
         "workflow_file": args.workflow,
         "sets": list(args.set),
         "submitted_at": now_iso(),
-        "status": "pending",
+        "status": "prepared",
     }
     save_json(run_dir / "workflow.json", workflow)
     save_json(run_dir / "run.json", meta)
 
-    server = args.server.rstrip("/")
-    print(f"提交任务到 {server}/prompt")
+    emit(args, event="submitting", server=server, message=f"提交任务到 {server}/prompt")
     try:
         response = http_json(f"{server}/prompt", method="POST", payload={"prompt": workflow}, timeout=SUBMIT_TIMEOUT)
     except ServerError as error:
         meta["status"] = "submit_error"
         meta["error"] = str(error)
         save_json(run_dir / "run.json", meta)
-        print(f"错误: 提交失败: {error}", file=sys.stderr)
+        emit_final(
+            args,
+            {
+                "ok": False,
+                "exit_code": 2,
+                "dry_run": False,
+                "run_id": run_name,
+                "run_name": run_name,
+                "run_dir": str(run_dir),
+                "prompt_id": None,
+                "status": "submit_error",
+                "error": str(error),
+                "message": f"提交失败: {error}",
+            },
+        )
         return 2
     prompt_id = response.get("prompt_id") if isinstance(response, dict) else None
     if not prompt_id:
         meta["status"] = "submit_error"
         meta["error"] = f"提交响应缺少 prompt_id: {json.dumps(response, ensure_ascii=False)[:500]}"
         save_json(run_dir / "run.json", meta)
-        print(f"错误: {meta['error']}", file=sys.stderr)
+        emit_final(
+            args,
+            {
+                "ok": False,
+                "exit_code": 2,
+                "dry_run": False,
+                "run_id": run_name,
+                "run_name": run_name,
+                "run_dir": str(run_dir),
+                "prompt_id": None,
+                "status": "submit_error",
+                "error": meta["error"],
+                "message": meta["error"],
+            },
+        )
         return 2
 
     meta["prompt_id"] = prompt_id
+    meta["status"] = "submitted"
     save_json(run_dir / "run.json", meta)
-    print(f"任务 ID: {prompt_id}")
+    emit(args, event="submitted", prompt_id=prompt_id, message=f"任务 ID: {prompt_id}")
 
     try:
         outcome = poll_history(server, prompt_id, args.timeout, args.poll_interval)
     except ServerError as error:
-        meta["status"] = "poll_error"
+        meta["status"] = "instance_unreachable"
         meta["error"] = str(error)
         save_json(run_dir / "run.json", meta)
-        print(f"错误: 轮询失败: {error}", file=sys.stderr)
+        emit_final(
+            args,
+            {
+                "ok": False,
+                "exit_code": 2,
+                "dry_run": False,
+                "run_id": run_name,
+                "run_name": run_name,
+                "run_dir": str(run_dir),
+                "prompt_id": prompt_id,
+                "status": "instance_unreachable",
+                "error": str(error),
+                "message": f"实例不可达: {error}",
+            },
+        )
         return 2
     except PollTimeout as error:
-        meta["status"] = "timeout"
+        meta["status"] = "monitoring_timeout"
         meta["error"] = str(error)
         save_json(run_dir / "run.json", meta)
-        print(f"错误: {error}", file=sys.stderr)
+        emit_final(
+            args,
+            {
+                "ok": False,
+                "exit_code": 4,
+                "dry_run": False,
+                "run_id": run_name,
+                "run_name": run_name,
+                "run_dir": str(run_dir),
+                "prompt_id": prompt_id,
+                "status": "monitoring_timeout",
+                "error": str(error),
+                "message": f"监控超时: {error}",
+            },
+        )
         return 4
 
     save_json(run_dir / "history.json", outcome["history"])
@@ -375,16 +536,40 @@ def run(args):
         errors = execution_errors(outcome["status"]) or ["ComfyUI 报告执行错误"]
         meta["error"] = errors
         save_json(run_dir / "run.json", meta)
-        for line in errors:
-            print(f"错误: {line}", file=sys.stderr)
-        print(f"记录: {run_dir}", file=sys.stderr)
+        emit_final(
+            args,
+            {
+                "ok": False,
+                "exit_code": 3,
+                "dry_run": False,
+                "run_id": run_name,
+                "run_name": run_name,
+                "run_dir": str(run_dir),
+                "prompt_id": prompt_id,
+                "status": "generation_failed",
+                "errors": errors,
+                "message": "工作流执行错误",
+                "detail_lines": [f"错误: {line}" for line in errors] + [f"记录: {run_dir}"],
+            },
+        )
         return 3
 
     outputs = outcome["entry"].get("outputs") if isinstance(outcome["entry"], dict) else {}
-    artifacts = extract_artifacts(outputs)
+    artifacts = extract_artifacts(outputs) + extract_mzsj_artifacts(outputs)
+    for artifact in artifacts:
+        if artifact["type"] != "mzsj" and artifact.get("view_url") is None:
+            query = urllib.parse.urlencode(
+                {
+                    "filename": artifact["filename"],
+                    "subfolder": artifact["subfolder"],
+                    "type": artifact["type"],
+                }
+            )
+            artifact["view_url"] = f"{server}/view?{query}"
     meta["artifacts"] = artifacts
+    meta["status"] = "completed"
     save_json(run_dir / "run.json", meta)
-    print(f"完成（{outcome['elapsed']:.0f}s）")
+    detail_lines = [f"完成（{outcome['elapsed']:.0f}s）"]
     if artifacts:
         for artifact in artifacts:
             where = (
@@ -392,13 +577,34 @@ def run(args):
                 if artifact["subfolder"]
                 else artifact["filename"]
             )
-            print(f"产物 {artifact['kind']} {artifact['type']}: {where}")
-            print(f"  查看: {view_url(server, artifact)}")
+            detail_lines.append(f"产物 {artifact['kind']} {artifact['type']}: {where}")
+            if artifact.get("view_url"):
+                detail_lines.append(f"  查看: {artifact['view_url']}")
+            elif artifact.get("source_path"):
+                detail_lines.append(f"  路径: {artifact['source_path']}")
     else:
-        print("提示: history 输出中没有可识别的 images/gifs/videos/audio 产物")
+        detail_lines.append("提示: history 输出中没有可识别的 images/gifs/videos/audio 产物")
     for line in collect_ui(outputs):
-        print(line)
-    print(f"记录: {run_dir}")
+        detail_lines.append(line)
+    detail_lines.append(f"记录: {run_dir}")
+    emit_final(
+        args,
+        {
+            "ok": True,
+            "exit_code": 0,
+            "dry_run": False,
+            "run_id": run_name,
+            "run_name": run_name,
+            "run_dir": str(run_dir),
+            "prompt_id": prompt_id,
+            "status": "completed",
+            "server": server,
+            "workflow_id": Path(args.workflow).stem,
+            "artifacts": artifacts,
+            "message": f"完成（{outcome['elapsed']:.0f}s）",
+            "detail_lines": detail_lines,
+        },
+    )
     return 0
 
 
@@ -413,7 +619,24 @@ def main(argv=None):
     try:
         return run(args)
     except UsageError as error:
-        print(f"错误: {error}", file=sys.stderr)
+        if args.json:
+            emit_final(
+                args,
+                {
+                    "ok": False,
+                    "exit_code": 1,
+                    "dry_run": bool(args.dry_run),
+                    "run_id": None,
+                    "run_name": args.run_name,
+                    "run_dir": None,
+                    "prompt_id": None,
+                    "status": "usage_error",
+                    "error": str(error),
+                    "message": str(error),
+                },
+            )
+        else:
+            print(f"错误: {error}", file=sys.stderr)
         return 1
 
 

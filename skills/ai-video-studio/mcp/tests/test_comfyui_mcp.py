@@ -73,11 +73,45 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(entry["provider"], "local")
         self.assertEqual(entry["inputs"], ["prompt"])
 
+    def test_manifest_license_and_source_metadata(self):
+        write_json(self.registry / "workflow.json", SAMPLE_WORKFLOW)
+        write_json(
+            self.registry / "workflow.manifest.json",
+            {
+                "id": "my-workflow",
+                "license": "redistribution-not-confirmed",
+                "source": "user-provided",
+                "distribution": "local-only",
+            },
+        )
+        entry = bridge.load_registry(str(self.registry))["workflows"][0]
+        self.assertEqual(entry["license"], "redistribution-not-confirmed")
+        self.assertEqual(entry["source"], "user-provided")
+        self.assertEqual(entry["distribution"], "local-only")
+
     def test_filename_id_without_manifest(self):
         write_json(self.registry / "plain.json", SAMPLE_WORKFLOW)
         entry = bridge.load_registry(str(self.registry))["workflows"][0]
         self.assertEqual(entry["id"], "plain")
         self.assertTrue(entry["ok"], entry["errors"])
+
+    def test_manifest_must_pair_with_workflow_stem(self):
+        write_json(self.registry / "video-v1.json", SAMPLE_WORKFLOW)
+        write_json(
+            self.registry / "video.manifest.json",
+            {"id": "video-v1", "purpose": "metadata"},
+        )
+        entry = bridge.load_registry(str(self.registry))["workflows"][0]
+        self.assertEqual(entry["id"], "video-v1")
+        self.assertEqual(entry["manifest_file"], None)
+        self.assertEqual(entry["description"], "")
+        write_json(
+            self.registry / "video-v1.manifest.json",
+            {"id": "video-v1", "purpose": "metadata"},
+        )
+        entry = bridge.load_registry(str(self.registry))["workflows"][0]
+        self.assertTrue(entry["manifest_file"].endswith("video-v1.manifest.json"))
+        self.assertEqual(entry["description"], "metadata")
 
     def test_invalid_json_is_reported(self):
         (self.registry / "broken.json").write_text("{nope", encoding="utf-8")
@@ -152,6 +186,65 @@ class ToolTests(unittest.TestCase):
         self.assertIn("r1", argv)
         self.assertIn("--shot", argv)
         self.assertIn("--iteration", argv)
+
+    def test_run_workflow_uses_json_output_and_returns_run_facts(self):
+        facts = {
+            "ok": True,
+            "exit_code": 0,
+            "dry_run": False,
+            "run_id": "r1",
+            "run_name": "r1",
+            "run_dir": "/tmp/project/runs/r1",
+            "prompt_id": "abc-123",
+            "status": "completed",
+            "server": "http://127.0.0.1:8188",
+            "artifacts": [
+                {
+                    "node": "7",
+                    "kind": "video",
+                    "filename": "out.mp4",
+                    "subfolder": "",
+                    "type": "mzsj",
+                    "source_path": "/tmp/out.mp4",
+                    "view_url": None,
+                }
+            ],
+        }
+        result = mock.Mock(returncode=0, stdout=json.dumps(facts), stderr="")
+        with mock.patch.object(bridge.subprocess, "run", return_value=result) as run:
+            outcome = bridge.tool_run_workflow(
+                "video",
+                str(self.registry),
+                server="http://127.0.0.1:8188",
+                dry_run=False,
+                project="/tmp/project",
+                run_name="r1",
+                timeout=120,
+                poll_interval=3,
+            )
+        argv = run.call_args.args[0]
+        self.assertIn("--json", argv)
+        self.assertTrue(outcome["ok"])
+        self.assertEqual(outcome["run_id"], "r1")
+        self.assertEqual(outcome["prompt_id"], "abc-123")
+        self.assertEqual(outcome["status"], "completed")
+        self.assertEqual(outcome["run_dir"], "/tmp/project/runs/r1")
+        self.assertEqual(outcome["artifacts"][0]["type"], "mzsj")
+        self.assertEqual(outcome["run_facts"]["run_id"], "r1")
+
+    def test_run_workflow_falls_back_when_stdout_is_not_json(self):
+        result = mock.Mock(returncode=3, stdout="错误: 节点缺失\n", stderr="")
+        with mock.patch.object(bridge.subprocess, "run", return_value=result):
+            outcome = bridge.tool_run_workflow(
+                "video",
+                str(self.registry),
+                server="http://127.0.0.1:8188",
+                dry_run=False,
+                timeout=60,
+            )
+        self.assertFalse(outcome["ok"])
+        self.assertEqual(outcome["exit_code"], 3)
+        self.assertNotIn("run_facts", outcome)
 
     def test_doctor_offline_arguments(self):
         result = mock.Mock(returncode=0, stdout="structure ok", stderr="")

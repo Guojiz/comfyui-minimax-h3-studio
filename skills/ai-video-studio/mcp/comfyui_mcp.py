@@ -146,6 +146,9 @@ def load_registry(registry_dir=None):
                 "name": meta.get("name") or workflow_id,
                 "description": meta.get("purpose") or "",
                 "provider": meta.get("provider"),
+                "license": meta.get("license"),
+                "source": meta.get("source"),
+                "distribution": meta.get("distribution"),
                 "inputs": meta.get("inputs"),
                 "outputs": meta.get("outputs"),
                 "required_nodes": meta.get("required_nodes"),
@@ -268,6 +271,7 @@ def build_run_argv(
     iteration,
     timeout,
     poll_interval,
+    json_output=False,
 ):
     argv = [
         str(workflow_path),
@@ -285,6 +289,8 @@ def build_run_argv(
     if iteration:
         argv += ["--iteration", iteration]
     argv += ["--timeout", str(timeout), "--poll-interval", str(poll_interval)]
+    if json_output:
+        argv.append("--json")
     for spec in sets or []:
         argv += ["--set", spec]
     return argv
@@ -355,9 +361,10 @@ def tool_run_workflow(
         iteration,
         timeout,
         poll_interval,
+        json_output=True,
     )
     result = _run_script(RUN_WORKFLOW, argv, timeout=timeout + SUBPROCESS_TIMEOUT_GRACE)
-    return {
+    outcome = {
         "ok": result.returncode == 0,
         "exit_code": result.returncode,
         "workflow_id": workflow_id,
@@ -365,6 +372,29 @@ def tool_run_workflow(
         "stdout": _snippet(result.stdout),
         "stderr": _snippet(result.stderr),
     }
+    parsed = None
+    if result.stdout.strip():
+        try:
+            parsed = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            parsed = None
+    if isinstance(parsed, dict):
+        for key in (
+            "run_id",
+            "run_name",
+            "run_dir",
+            "prompt_id",
+            "status",
+            "server",
+            "artifacts",
+            "errors",
+            "error",
+            "message",
+        ):
+            if key in parsed:
+                outcome[key] = parsed[key]
+        outcome["run_facts"] = parsed
+    return outcome
 
 
 def _tool_error(message):
