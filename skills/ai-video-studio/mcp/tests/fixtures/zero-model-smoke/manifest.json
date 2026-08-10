@@ -1,0 +1,29 @@
+{
+  "id": "zero-model-smoke",
+  "name": "Zero-model smoke workflow",
+  "purpose": "Verify submit/status/download end-to-end without any video model or GPU generation",
+  "workflow": "workflow.json",
+  "bindings": {
+    "reference_image": "1.inputs.image"
+  },
+  "inputs": [
+    "reference_image"
+  ],
+  "outputs": [
+    "image"
+  ],
+  "required_nodes": [
+    "LoadImage",
+    "ImageScale",
+    "SaveImage"
+  ],
+  "verified": {
+    "status": "live-tested",
+    "date": "2026-08-10",
+    "scope": "Real submit/get_run_status/download_artifacts on local ComfyUI 0.31.0 (run smoke-004); no model required, completes in under a second",
+    "instance": "local-comfy"
+  },
+  "source": "local-test",
+  "license": "MIT",
+  "distribution": "local-only"
+}

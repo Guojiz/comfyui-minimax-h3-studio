@@ -380,6 +380,50 @@ class UploadAndDownloadTests(unittest.TestCase):
         self.assertEqual(meta["artifacts"][0]["type"], "mzsj")
         self.assertEqual(meta["provider_task_id"], "mzsj-9")
 
+    def test_completed_status_merges_generic_images_with_view_url(self):
+        with mock.patch.object(
+            bridge.run_mgmt_mod, "http_json", return_value={"prompt_id": "p-1"}
+        ):
+            bridge.tool_submit_workflow(
+                "video",
+                str(self.registry),
+                instance_id="local-a",
+                catalog_path=self.catalog,
+                project=self.project,
+                run_name="r6",
+            )
+        history = {
+            "p-1": {
+                "status": {"status_str": "success", "completed": True},
+                "outputs": {
+                    "3": {
+                        "images": [
+                            {
+                                "filename": "smoke_00001_.png",
+                                "subfolder": "",
+                                "type": "output",
+                            }
+                        ]
+                    }
+                },
+            }
+        }
+        with mock.patch.object(
+            bridge.run_mgmt_mod,
+            "http_json",
+            side_effect=[{"queue_running": [], "queue_pending": []}, history],
+        ):
+            result = bridge.tool_get_run_status(
+                "r6", self.project, instance_id="local-a", catalog_path=self.catalog
+            )
+        self.assertEqual(result["status"], "completed")
+        meta = json.loads(
+            (Path(self.project) / "runs" / "r6" / "run.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(len(meta["artifacts"]), 1)
+        self.assertEqual(meta["artifacts"][0]["filename"], "smoke_00001_.png")
+        self.assertIn("/view?", meta["artifacts"][0]["view_url"])
+
 
 if __name__ == "__main__":
     unittest.main()

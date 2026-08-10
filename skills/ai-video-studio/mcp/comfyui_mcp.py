@@ -634,7 +634,7 @@ def tool_get_run_status(
         if provider_task_id:
             extra["provider_task_id"] = provider_task_id
         if status["status"] == "completed":
-            run_mgmt_mod.merge_artifacts_into_meta(meta, status["entry"])
+            run_mgmt_mod.merge_artifacts_into_meta(meta, status["entry"], server_url)
             if meta.get("artifacts"):
                 extra["artifacts"] = meta["artifacts"]
     run_mgmt_mod.write_status(
@@ -643,6 +643,7 @@ def tool_get_run_status(
         status["status"],
         server_url,
         extra,
+        meta=meta,
     )
     result = {
         "ok": True,

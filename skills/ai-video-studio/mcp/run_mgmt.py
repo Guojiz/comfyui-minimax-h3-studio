@@ -147,14 +147,59 @@ def extract_mzsj_artifacts(outputs):
     return artifacts
 
 
-def merge_artifacts_into_meta(meta, entry):
+def extract_generic_artifacts(outputs):
+    """Generic ComfyUI file outputs (images/gifs/videos/audio) from history."""
+    artifacts = []
+    seen = set()
+
+    def walk(obj, node_id, hint):
+        if isinstance(obj, dict):
+            if isinstance(obj.get("filename"), str) and ("type" in obj or "subfolder" in obj):
+                key = (obj.get("type", ""), obj.get("subfolder", ""), obj.get("filename", ""))
+                if key not in seen:
+                    seen.add(key)
+                    artifacts.append(
+                        {
+                            "node": node_id,
+                            "kind": hint or obj.get("type", "file"),
+                            "filename": obj.get("filename", ""),
+                            "subfolder": obj.get("subfolder", "") or "",
+                            "type": obj.get("type", ""),
+                            "source_path": None,
+                            "view_url": None,
+                        }
+                    )
+                return
+            for key, value in obj.items():
+                walk(value, node_id, key if isinstance(value, (dict, list)) else hint)
+        elif isinstance(obj, list):
+            for value in obj:
+                walk(value, node_id, hint)
+
+    for node_id, out in outputs.items():
+        walk(out, node_id, None)
+    return artifacts
+
+
+def merge_artifacts_into_meta(meta, entry, server=None):
     """Merge structured artifacts from a completed history entry into run meta."""
     if not isinstance(entry, dict):
         return meta
     outputs = entry.get("outputs") if isinstance(entry, dict) else None
     if not isinstance(outputs, dict):
         return meta
-    artifacts = extract_mzsj_artifacts(outputs)
+    artifacts = extract_mzsj_artifacts(outputs) + extract_generic_artifacts(outputs)
+    if server:
+        for artifact in artifacts:
+            if artifact.get("view_url") is None and artifact.get("type") != "mzsj":
+                query = urllib.parse.urlencode(
+                    {
+                        "filename": artifact["filename"],
+                        "subfolder": artifact["subfolder"],
+                        "type": artifact["type"],
+                    }
+                )
+                artifact["view_url"] = server + "/view?" + query
     if artifacts:
         meta["artifacts"] = artifacts
         provider_task_id = derive_provider_task_id(entry)
@@ -308,8 +353,9 @@ def status_update_meta(meta, status, server, extra=None):
     return meta
 
 
-def write_status(project, run_id, status, server, extra=None):
-    meta = read_run_meta(read_run_dir(project, run_id))
+def write_status(project, run_id, status, server, extra=None, meta=None):
+    if meta is None:
+        meta = read_run_meta(read_run_dir(project, run_id))
     status_update_meta(meta, status, server, extra)
     save_json(Path(project).expanduser() / "runs" / run_id / "run.json", meta)
     return meta
