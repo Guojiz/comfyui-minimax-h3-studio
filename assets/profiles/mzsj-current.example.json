@@ -1,0 +1,19 @@
+{
+  "id": "mzsj-current",
+  "provider": "mzsj-videos",
+  "defaults": {
+    "model": "minimax/minimax-h3-fl2va",
+    "size": "768x448",
+    "seconds": 5,
+    "timeout_seconds": 3600
+  },
+  "observations": [
+    {
+      "seconds": 15,
+      "approx_minutes": 10,
+      "date": "2026-08-10",
+      "scope": "current self-hosted deployment; not a model-wide limit"
+    }
+  ],
+  "secrets": "local config.json only"
+}

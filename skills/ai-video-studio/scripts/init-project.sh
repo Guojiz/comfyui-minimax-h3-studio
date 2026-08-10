@@ -1,5 +1,5 @@
 #!/bin/bash
-# init-project — 初始化 AI Video Studio 媒体项目骨架
+# init-project — 初始化 AI Video Studio 最小项目上下文
 # 用法: init-project.sh [项目目录] [--name "项目标题"] [--git] [--dry-run]
 set -euo pipefail
 
@@ -16,8 +16,8 @@ usage() {
   cat <<'EOF'
 用法: init-project.sh [项目目录] [--name "项目标题"] [--git] [--dry-run]
 
-创建 project.md、shots/index.md、source、brief-and-story、characters、scenes、styles、props、
-references、storyboards、workflows、audio、final、runs 目录，以及适合媒体项目的 .gitignore。
+创建 project.md、assets.md、decisions.md、workflows/ 和适合媒体项目的 .gitignore。
+其他目录等实际需要时再创建。
 
 选项:
   --name NAME   在新建的 project.md 中填入项目标题（默认取目录名）
@@ -26,7 +26,7 @@ references、storyboards、workflows、audio、final、runs 目录，以及适�
   -h, --help    显示帮助
 
 环境变量:
-  PROJECT_TEMPLATE_DIR  模板目录（默认脚本上三级 assets/project-template）
+  PROJECT_TEMPLATE_DIR  模板目录（默认 Skill 自带的 assets/project-template）
 
 已有文件和目录永远不会被覆盖或删除。
 EOF
@@ -72,12 +72,8 @@ if [ ! -d "$TPL_DIR" ]; then
   exit 2
 fi
 
-DIRS="source brief-and-story characters scenes styles props references storyboards workflows shots audio final runs"
-
 run_or_dry mkdir -p "$PROJECT_DIR"
-for d in $DIRS; do
-  run_or_dry mkdir -p "$PROJECT_DIR/$d"
-done
+run_or_dry mkdir -p "$PROJECT_DIR/workflows"
 
 CREATED_PROJECT_MD=0
 if [ -e "$PROJECT_DIR/project.md" ]; then
@@ -87,17 +83,13 @@ else
   CREATED_PROJECT_MD=1
 fi
 
-if [ -e "$PROJECT_DIR/.gitignore" ]; then
-  log "保留已有 .gitignore: $PROJECT_DIR/.gitignore"
-else
-  run_or_dry cp "$TPL_DIR/.gitignore" "$PROJECT_DIR/.gitignore"
-fi
-
-if [ -e "$PROJECT_DIR/shots/index.md" ]; then
-  log "保留已有 shots/index.md: $PROJECT_DIR/shots/index.md"
-else
-  run_or_dry cp "$TPL_DIR/shots/index.md" "$PROJECT_DIR/shots/index.md"
-fi
+for file in assets.md decisions.md .gitignore; do
+  if [ -e "$PROJECT_DIR/$file" ]; then
+    log "保留已有 $file: $PROJECT_DIR/$file"
+  else
+    run_or_dry cp "$TPL_DIR/$file" "$PROJECT_DIR/$file"
+  fi
+done
 
 if [ "$CREATED_PROJECT_MD" = 1 ] && [ "$DO_DRY" = 0 ]; then
   TMP_MD="$(mktemp "${TMPDIR:-/tmp}/init-project.XXXXXX")"
@@ -120,9 +112,7 @@ if [ "$DO_GIT" = 1 ]; then
 fi
 
 log "项目骨架: $PROJECT_DIR"
-for d in $DIRS; do
-  log "  $d/"
-done
-log "文件: project.md, shots/index.md, .gitignore"
+log "目录: workflows/"
+log "文件: project.md, assets.md, decisions.md, .gitignore"
 if [ "$DO_GIT" = 1 ]; then log "Git: 已初始化"; fi
 if [ "$DO_DRY" = 1 ]; then log "（dry-run：未写入任何内容）"; fi

@@ -1,166 +1,144 @@
 ---
 name: ai-video-studio
 description: >
-  AI 视频生产技能，以 Agent、Skill、资产、ComfyUI 四个核心组织视频制作：
-  Agent 负责理解需求与创意编排，Skill 沉淀可复用流程与审美，资产实现角色/场景/风格
-  跨项目复用，ComfyUI 是本技能的画布与技术执行面。适用：生成视频、做短片/广告/
-  种草视频、生成首帧图、长视频分段制作、复用角色资产、运行 ComfyUI 工作流出片。
-  触发表述：生成视频、做一条片子、出个视频、文生视频、图生视频、跑工作流、
-  视频 production、video generation、make a clip、保存这个流程为 skill。
-  可驱动本机 ComfyUI 的本地模型、第三方 API 与任意已安装节点；能力以实际加载为准。
+  教 Agent 使用 Skill、项目资产与 ComfyUI 制作视频，并在需要时选择、修改或运行
+  workflow。用于生成视频、制作广告/短片/MV/长视频、从已有素材逐步创作、管理中间
+  产物与版本、检查和局部返工、把成功方法沉淀为新 Skill。用户常说：做条视频、生成
+  片子、先给我看效果、继续做下一镜、打开 ComfyUI、跑这个 workflow、保存这个流程。
 ---
 
-# AI Video Studio — 视频生产 Skill
+# AI Video Studio
 
-> 版本：2.0.0（四核心重构：Agent / Skill / 资产 / ComfyUI，三段式降为快速路径）
+## 定位
 
-本技能把“拍一条片”拆成四个可复用核心：
+把当前宿主 Agent（默认 Codex）作为操作主体，把客户作为利用主体和最终裁决者。
+不要在本插件内重新实现 Agent、编排器、状态机、App、CLI 产品或独立画布。
 
-| 核心 | 在本技能中的角色 | 主文档 |
-| --- | --- | --- |
-| Agent | 创作大脑：解析简报、调研、定方向、调度执行、验收、沉淀经验 | `references/production-workflow.md` |
-| Skill | 可复用知识与流程：本文件 + references + scripts | `references/skill-evolution.md` |
-| 资产 | 角色/场景/风格/道具等可复用素材，跨项目调用，选择性入库 | `references/asset-management.md` |
-| ComfyUI | 操作面/执行面/技术工作流画布：节点 + workflow JSON + API | `references/comfyui-workflows.md` |
+四个核心各司其职：
 
-ComfyUI 是执行入口，不是唯一流程。三段式“提示词增强 → 首帧生图 → 视频生成”
-保留为**快速路径**：适合一句话出片；正式生产走 `references/production-workflow.md`。
+| 核心 | 职责 |
+| --- | --- |
+| Agent | 理解客户、选择下一步、操作工具、检查结果、整理和交付 |
+| Skill | 教 Agent 怎样做好一类视频任务，保存方法、判断标准和纠错经验 |
+| 资产 | 保存输入、可见产物、来源关系、版本和客户决定 |
+| ComfyUI | workflow-as-code 的操作面、执行面和技术调试器 |
 
-## 环境事实（已验证）
+Plugin 只是把 Skill、节点、workflow、配置示例和必要适配脚本打包。客户入口始终是对话，
+不是脚本命令。ComfyUI 必要但不垄断执行；直接 API、FFmpeg 或其他工具能更可靠完成时可以使用。
 
-- ComfyUI 服务：`http://127.0.0.1:8188`（Comfy Desktop 或 headless）
-- 自定义节点包：
-  - `comfyui-mzsj-api`：`DeepSeekPromptEnhance` / `MzsjVideoGenerate`
-  - `comfyui-huoshen-image`：`HuoshenImageGenerate`
-- API key 配置：各节点目录 `config.json`（仓库只带 `config.json.example`；真实 key 勿外传、勿入库）
-- 文生快速模板：Skill 内 `assets/workflow_api_mzsj_video_text.json`（插件根另有镜像）
-- 旧三段式模板：`assets/workflow_api_mzsj_video.json`，仅兼容支持本地 IMAGE/data URL 的旧网关
-- 精选工作流库：插件根 `examples/workflows/`（video / first-frame / upscale / product 四类）
-- 产物目录：默认 `~/ComfyUI-Shared/output/`，视频在其 `mzsj/` 子目录；可用 `COMFY_OUTPUT_DIR` 覆盖
+## 默认行为：渐进创作
 
-## 能力边界（快速路径与 Studio 分层）
+不要先把整部作品固化成完整流水线，也不要把一句话直接赌成最终电影。循环执行：
 
-**默认三段式快速路径当前直接暴露：**
+1. 读取客户要求、选中文件及项目中的 `project.md`、`assets.md`、`decisions.md`。
+2. 判断任务可以直接完成，还是需要逐步创作。
+3. 选择当前**成本最低、最能帮助客户判断方向**的下一项可见产物。
+4. 生成并直接展示产物，简要说明它来自什么、解决什么、下一步可以是什么。
+5. 根据客户反应继续、修改、换方向或停止；只重做受影响部分。
+6. 每次执行后更新资产来源和状态；稳定决定写入 `decisions.md`。
+7. 达到交付目标后做 QC、整理最终文件，并在有意义的里程碑记录版本。
 
-- 提示词增强（DeepSeek 兼容接口）
-- 首帧生图（`HuoshenImageGenerate`）
-- 文生视频 / 自动生成单张首帧后的图生视频（`MzsjVideoGenerate`）
+“下一项产物”可以是方向卡、效果图、角色/场景参考、文本分镜、单个测试镜头、视频片段或粗剪；
+由任务与客户节奏决定。镜头表、批量生成和完整制作计划都是可选工具，不是所有项目的前置门。
 
-当前 `/v1/videos` 网关使用 HTTPS 图片地址：节点提供 `first_frame_url`、`last_frame_url` 与
-`reference_image_urls`。本地 `IMAGE`/data URL 只留给 `api_mode=legacy` 的旧网关；不要把本地
-图片张量直接提交给当前网关。公开临时图片前必须获得用户授权。
+## 客户交互
 
-**打包节点当前未实现，或默认快速路径未封装（不是整个 Studio 不支持）：**
+- 已明确的要求直接执行，不重复确认。
+- 可逆、低成本且不改变核心方向的工作自动完成并报告。
+- 中等风险先做小样或低成本预览，让客户看见后再决定。
+- 高成本、授权/公开上传、不可逆动作或核心方向分叉必须先确认。
+- 客户想逐步看时，每个重要可见产物后停下；客户要求少打扰时，推进到下一个重要里程碑。
+- 技术细节默认隐藏。客户要求查看、接管或调试时才打开 ComfyUI，并解释语义输入输出。
 
-- 素材上传与图/视频/音频多模态参考（锁脸/锁动作/运镜参考等）
-- 视频/音频精准编辑（替换、局部修改、背景替换、台词替换）
-- 单次生成长视频（单条 4–15 秒）
+不要把“一次确认完整 shot 表和总预算后批量生成”写成默认生产制度。预算授权只能覆盖客户已经
+理解的范围；新方向、新公开上传或明显扩大的费用需要重新确认。
 
-本机 ComfyUI 可加载**任意已安装节点与工作流**；首尾帧、参考素材、精准编辑等若由
-其他工作流或扩展节点提供，按该工作流实际能力执行，本 Skill 不限制实例能力。
-提交前用 `object_info` 确认实际加载的节点，不要把默认打包节点的边界扩大成产品边界，
-也不要声称默认打包节点支持未验证的能力。
+## 项目事实与资产
 
-上游模型能力说明只作为提示词创作参考，不代表默认打包节点已实现。
-
-## 默认生产路径（Agent 主导）
-
-1. **方向与授权**：把 brief、一句话创意、风格卡、shot 表和本轮生成预算合并为一次确认。
-2. **准备**：Agent 自主完成调研、资产整理、分镜、提示词和 workflow 体检；不为低风险中间步骤反复打断用户。
-3. **批量执行**：在已授权预算内先批量准备首帧/素材，再批量生成视频；每次 run 关联 `shot_id` 与 `iteration`。
-4. **QC 与局部返工**：自动验收并更新 `shots/index.md`，只重做 `qc_rework` 镜头；达到预算、连续失败 3 次或目标漂移才回用户。
-
-客户负责目标和关键取舍，Agent 对作品负责。工作流是可替换的执行工具，不是让客户操作的菜单。细节见
-`references/production-workflow.md` 与 `references/rework.md`。
-
-新项目先初始化资产目录（已有内容不会被覆盖）：
+需要持续、多产物或可回退的任务时，初始化最小四件套：
 
 ```bash
 bash scripts/init-project.sh <项目目录> [--name "项目名称"] [--git]
 ```
 
-## 快速路径：文生直出（一句话出片）
+只预建：
 
-仅当用户要“快速出一版”、参数齐全时使用；需要改工作流结构或正式生产时走默认路径。
+- `project.md`：当前目标、锁定约束、进度和下一最小步骤；
+- `assets.md`：产物、来源、版本、workflow/run 关系；
+- `decisions.md`：客户确认、否决和替代的稳定决定；
+- `workflows/`：本项目实际选择或修改的 workflow JSON。
 
-文生直出直接执行 `scripts/make-video.sh`，不要复制脚本另造同类实现（Qoder 安装后路径
-`.qoder/skills/ai-video-studio/scripts/make-video.sh`）：
+其他目录在真正产生相应内容时再创建。资产状态只写在 `assets.md`，不因状态变化搬文件：
+
+- `temporary`：试验或失败输出，可以清理；
+- `candidate`：值得客户查看或比较；
+- `approved`：客户接受或已被正式下游采用。
+
+只有 Agent 能依据客户反馈更新资产语义。runner 只记录客观执行事实，不能自动决定 `approved`。
+完整规则见 `references/asset-management.md`。
+
+## ComfyUI：workflow as code
+
+把 workflow 当代码处理：读取现有 JSON，根据任务选择或修改，复制到项目 `workflows/`，先体检/
+dry-run，再执行并读取 history。不要让预设 `mode` 或节点编号成为产品抽象。
 
 ```bash
-bash scripts/make-video.sh "雨夜霓虹街道，赛博朋克" \
-  [--duration 5] [--resolution 720p] [--size 1536x1024] [--no-open] [--dry-run]
+python3 scripts/workflow-doctor.py <workflow.json>
+python3 scripts/run-workflow.py <workflow.json> \
+  --project <项目目录> \
+  --set '节点ID.inputs.字段=JSON值' --dry-run
 ```
 
-- 退出码：0 成功；2 自动拉起失败；3 执行错误（已打印节点与异常）；4 超时
-- 服务未启动时脚本会自动拉起 ComfyUI 并等待就绪，日志 `~/Library/Logs/comfyui-headless.log`
-- 需要指定项目目录、保留 run 记录、修改任意节点字段或做无副作用 `--dry-run` 时，改用 `scripts/run-workflow.py`
-- 单步能力：只生图/只增强提示词 → 按 `references/comfyui-workflows.md` 直接提交对应 API JSON
+去掉 `--dry-run` 才会提交。`run-workflow.py` 是 Agent 内部的确定性适配工具，不是用户产品入口。
+它保存实际 workflow、history、run 状态和输出；需要关联镜头时可选用 `--shot`、`--iteration`。
 
-## ComfyUI 操作要点
+正式库中的每个 workflow 必须声明用途、输入输出、依赖、provider/profile、来源、许可和验证状态。
+项目修改版放项目 `workflows/`；许可或验证不明的外部 workflow 只能作为本地研究材料，不能冒充正式能力。
+详情见 `references/comfyui-workflows.md`。
 
-- 健康检查：`curl -s http://127.0.0.1:8188/object_info | grep MzsjVideoGenerate` 无结果 → 服务未启动或节点未加载
-- 任意 API 格式 workflow：用 `scripts/run-workflow.py` 校验、注入节点字段、提交、轮询，并把实际 workflow/history/run 记录保存到项目 `runs/`
-- 提交前运行 `scripts/workflow-doctor.py <workflow.json>`，缺节点或模型资源就换 workflow，不在付费窗口内试错
-- 提交流程：POST `/prompt` 得 `prompt_id`，轮询 `/history/<prompt_id>` 到终态；错误读 `execution_error`
-- DNS 解析到 `198.18.x.x` 且超时 → 用户代理软件掉线，提醒恢复代理，勿反复重试
-- 同一参数失败 ≥3 次必须停下换策略或询问用户（anti-loop）
-- 工作流形态、批量、复用与故障排查见 `references/comfyui-workflows.md`
+## 配置分层
 
-## 提示词铁律（提交前必过）
+始终区分：
 
-详细方法论与完整模板见 `references/prompt-craft.md` 与 `references/prompt-templates.md`。
-官方公式：`完整提示词 = 参考素材说明 + 核心创意 + 画面过程说明`。铁律：
+```text
+模型能力 != provider API 契约 != 当前部署 profile
+```
 
-1. **素材引用**：有素材时用 `@图片N/@视频N` 编号并逐个写用途；默认快速路径无素材上传时跳过该段
-2. **核心创意四要素**：主体 + 地点 + 事件 + 题材风格；默认会切镜，一镜到底需明说
-3. **画面过程按 shot 分段**：景别+内容+运镜+动作+台词+音效；台词长度对齐（中文 3–4 字/秒）
-4. **正向描述**：负向词会激活被禁对象，改写为目标可见状态
-5. **声音控制**：不要配乐必须显式写 `非叙事性音乐：N/A`
-6. **文字必给原文**：具体文字/Logo/标语写出原文
-7. **锁介质**：每条 prompt 末尾写 `Medium: <one primary medium>`
-8. **提交前过踩坑表**：prompt-craft.md 第三节逐条自检
+- 模型/创作知识放提示词 reference；
+- provider 描述接口字段、状态和下载契约；
+- profile 描述当前实例的默认值、限制和实测观察；
+- API Key 只保存在本机忽略文件中，不进入对话、workflow 或 Git。
 
-## 资产纪律（摘要）
+只有 profile 限制影响当前请求时才向客户简要说明。不要把某个实例的 `768x448`、耗时或供应商
+字段写成整个 H3 或 Studio 的永久限制。
 
-- 真实 key、输出产物、临时文件不入库；源码、配置示例、workflow JSON、文档、精选示例素材入库
-- 资产命名 `类别-名称-版本`，配元数据文件记录用途/来源/授权/规格
-- 新项目优先复用已登记资产，不重复生成
-- Git 选择性版本管理与完整目录规范见 `references/asset-management.md`
+## 质量、返工与长视频
 
-## 长视频
+- 结果拿到后检查技术完整性、内容符合度、连续性和声音；无法可靠视觉判断时使用多模态工具或请客户看候选。
+- 一次只改变一个主要变量，保留旧候选；局部失败只重做受影响资产及下游。
+- 同一策略连续失败 3 次、预算耗尽、目标漂移或需要新授权时停止并请求决策。
+- 长视频按需要逐段推进：先验证角色/场景/风格锚点和关键镜头，再继续其他片段；不要把 `duration` 调长当成长片方案。
+- 字幕、响度、转场、封装等确定性问题优先使用 FFmpeg/剪辑工具，不浪费生成额度。
 
-- 单条生成 4–15 秒；>15 秒 = 规划 → 分段生成 → 连续性锚定 → Agent 用 FFmpeg/剪辑工具拼接
-  （工具可用性以本机环境为准）
-- 分段规划、连续性锚点、台词预算、失败修复见 `references/long-video.md`
-
-## 质量控制
-
-- 提交前 QC（提示词）与结果 QC（技术+内容）都要做；完成定义来自已确认的方向与 shot 表
-- 一次只改一个变量；失败 ≥3 次停下询问；记录失败样例作为迭代证据
-- 完整清单见 `references/quality-control.md`
+按需读取 `references/quality-control.md`、`references/rework.md` 和 `references/long-video.md`。
 
 ## Skill 演进
 
-- 同一流程重复 ≥3 次、用户每次做相同修正、流程含隐性知识时，提议保存为 Skill
-- 新知识先沉淀到 references 再链接进 SKILL.md，保持本文件精简
-- 创建/修改/验证/迭代流程见 `references/skill-evolution.md`
-
-## 成本纪律
-
-- 文生快速路径消耗 1 次提示词增强 + 1 次视频额度；旧三段式另消耗 1 次生图额度；其他 workflow 按实际节点计算
-- 高成本操作按“方向 + shot 表 + 总预算”一次授权；授权范围内不逐镜头重复确认
-- 调试用最小任务；用户未确认前不重复提交相同任务
+客户明确要求保存流程、同类任务重复出现或相同纠错反复发生时，生成 Skill 草稿。安装、覆盖或大幅
+修改正式 Skill 前告知客户；具体创建与验证交给宿主的 `skill-creator`，不要在本 Skill 重复实现。
 
 ## 文档地图
 
-| 文档 | 何时加载 |
+| 文档 | 何时读取 |
 | --- | --- |
-| `references/production-workflow.md` | 正式做一条片、用户要求按流程执行 |
-| `references/prompt-craft.md` | 写/改提示词、失败排查 |
-| `references/prompt-templates.md` | 需要空白模板或完整范例 |
-| `references/comfyui-workflows.md` | 任何一次执行、改工作流、批量、故障排查 |
-| `references/asset-management.md` | 准备/检索/登记素材、决定入库内容 |
-| `references/long-video.md` | 目标超过 15 秒或多镜头叙事 |
-| `references/quality-control.md` | 提交前、拿到结果后、重试前、交付前 |
-| `references/rework.md` | 镜头状态、版本选择、局部返工与回滚 |
-| `references/skill-evolution.md` | 创建/修改/保存 Skill、沉淀经验 |
+| `references/production-workflow.md` | 正式制作或需要判断下一步 |
+| `references/comfyui-workflows.md` | 选择、修改、体检、执行或调试 workflow |
+| `references/asset-management.md` | 登记产物、来源、状态、授权和 Git 版本 |
+| `references/prompt-craft.md` | 编写或修正视频提示词 |
+| `references/prompt-templates.md` | 需要提示词模板 |
+| `references/quality-control.md` | 检查候选、交付或决定返工 |
+| `references/rework.md` | 局部修改、版本比较和回滚 |
+| `references/long-video.md` | 多镜头或长视频 |
+| `references/skill-evolution.md` | 从实践生成或更新 Skill |
+| `references/codex.md` | Codex 宿主的工具映射 |
+| `references/qoder.md` | Qoder 兼容安装与路径 |

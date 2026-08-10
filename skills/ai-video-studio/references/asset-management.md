@@ -1,203 +1,82 @@
-# 资产管理
+# 资产、来源与版本
 
-何时加载：准备或检索素材、整理项目文件、决定哪些文件入库、把已验证素材跨项目复用时加载本篇。
+> 产生、比较、批准、复用或归档图片、视频、音频、文档和 workflow 时读取。
 
-## 一、资产是什么
+## 原则
 
-资产 = 可复用的素材，而不是一次性草稿。常见类型：
+资产不是独立数据库，而是项目中可继续使用的真实文件及其轻量来源记录。ComfyUI workflow/history
+能说明一次运行；`assets.md` 补充跨运行、跨工具和客户选择后的关系。
 
-| 类型 | 示例 | 入库价值 |
-|---|---|---|
-| 角色 | 林晚-v1 参考图 | 高：跨镜头、跨项目锁脸 |
-| 场景 | 竹林庭院氛围图 | 高：重复使用环境 |
-| 风格包 | 胶片/赛博朋克风格参考 | 高：统一视觉 |
-| 道具 | 产品瓶身图 | 高：品牌一致性 |
-| 参考素材 | 调研收集的构图/光影图 | 中：看授权与体积 |
-| 成片 | 已交付 mp4 | 中：归档而不是入库 |
+不要预建一整套资产目录。真正产生某类文件时再创建合适目录；状态只写元数据，不搬文件、不破坏
+workflow 引用。
 
-来源可以是：本流水线生成产物（`huoshen_*.png`、`output/mzsj/*.mp4`）、用户提供的文件、调研收集物。
+## 三种状态
 
-判定规则：会在第二次及以后使用才入库；一次性草稿放项目临时目录，不进资产目录。
+| 状态 | 含义 | 处理 |
+| --- | --- | --- |
+| `temporary` | 试验、失败或尚未判断 | 可以清理，不默认进入版本记录 |
+| `candidate` | Agent 判断值得客户查看或比较 | 保留并展示，不能冒充已批准 |
+| `approved` | 客户明确接受或已被正式下游采用 | 默认进入资产清单和有意义的版本里程碑 |
 
-## 二、本地目录与命名约定
+runner 只记录 workflow、参数、run ID、history 和输出路径等客观事实。只有 Agent 能根据客户反应
+更新 `candidate/approved`；脚本不能自动判断创意价值。
 
-建议目录（放在项目根，与插件 `assets/` 区分）：
+## `assets.md` 最小记录
 
-```text
-<项目>/
-  characters/   # 角色
-  scenes/       # 场景
-  styles/       # 风格包
-  props/        # 道具
-  references/   # 调研/参考素材
-  final/        # 成片
+只有 `id`、`path`、`status` 必填，其余有事实时再写：
+
+```yaml
+assets:
+  - id: shot-01-v2
+    path: outputs/shot-01-v2.mp4
+    status: candidate
+    type: video
+    derived_from: [character-main-v1, scene-night-v1]
+    workflow: workflows/h3-ref2va.json
+    run_id: task_xxx
+    model: minimax/minimax-h3-ref2va
+    content_hash: sha256:...
+    authorization: owned
+    note: 等客户比较 v1/v2
 ```
 
-文件名模板：`类别-名称-版本-用途.ext`，示例：
+规则：
 
-```text
-characters/林晚-v1-锁脸.png
-characters/林晚-v1-锁脸.md     # sidecar 元数据
-styles/胶片-v1-风格参考.png
-```
+- 新版本永不覆盖旧文件；使用稳定 `id` 与递增版本。
+- `derived_from` 记录“什么产生什么”，不要保存完整聊天或内部思考。
+- 有肖像、版权、公开上传或第三方素材时记录授权状态。
+- 客户否决的方向写 `decisions.md`，相应产物保留为 temporary 或按客户要求清理。
+- workflow 修改版也作为资产登记，并保存来源、许可和验证状态。
 
-命名规则：
-- 类别目录用英文小写；文件名允许中文，但不要用空格，用 `-` 或 `_` 连接，避免 shell 与脚本转义问题。
-- 版本用 `v1`、`v2` 递增，同一资产新版本不覆盖旧版本。
-- 用途词与 `prompt-craft.md` 的用途词一致：人物参考（锁脸）/物体参考/场景参考/关键帧/风格参考/构图参考等。
+## 复用与项目关系
 
-## 三、sidecar 元数据（必须）
+复用前检查：用途是否匹配、来源是否可信、授权是否覆盖本项目、文件是否仍与哈希一致、历史表现
+是否可靠。角色、场景、风格和产品参考应保持稳定 ID；新版本通过 `derived_from` 或备注关联旧版本。
 
-每个入库素材配一个同名 `.md`，至少记录五项：
+ComfyUI UI 可以展示一次 workflow 的节点和中间结果，但跨运行的批准关系仍以项目文件为准。客户
+想看技术细节时打开 ComfyUI；平时由 Agent 在对话中展示真实产物并解释来源。
 
-| 字段 | 必填内容 |
-|---|---|
-| 用途词 | 人物参考（锁脸）/物体参考/场景参考/关键帧/风格参考/构图参考… |
-| 来源 | 本项目生成 / 用户提供 / 调研收集（附出处） |
-| 授权/敏感 | 可商用/仅个人/未确认；肖像是否已授权；敏感内容标记 |
-| 规格 | 尺寸/格式/大小（如 1536x1024 PNG，2.4MB） |
-| 提示词引用编号 | 最近一次生成中的 `@图片1` 等编号与任务记录 |
+## 格式和安全
 
-模板：
+提交前用 `ffprobe` 或适合的媒体工具检查格式、尺寸、时长、编码和文件完整性。真实 API Key、临时
+公网 URL、未授权素材和内部模型路径不得进入可发布的资产记录。
 
-```markdown
-# 林晚-v1
-- 用途词：人物参考（锁脸）
-- 来源：本项目生成（2026-08-05）
-- 授权：可商用；肖像：已获用户授权
-- 规格：1536x1024 PNG，2.4MB
-- 提示词引用编号：@图片1（任务 <prompt_id> 使用）
-- 复用记录：已用于 2 条短片，脸部一致 OK
-```
+参考格式限制必须属于相应 provider/profile，不要在本文件把某个供应商当前限制写成全局规则。
 
-## 四、入库前格式校验
+## Git 选择性版本管理
 
-上游输入约束（作为校验标准）：
+Git 管 Skill、workflow、提示词、项目事实、资产清单、决策、配置示例及精选小资产；大型媒体默认
+保存在项目资产目录或外部存储，Git 记录路径、哈希和谱系。确实需要跨设备复现时再选择 Git LFS。
 
-| 素材 | 允许格式 | 单文件上限 |
-|---|---|---|
-| 视频 | H.264/H.265（内嵌 AAC/MP3） | 50MB |
-| 图片 | JPG/JPEG/PNG/WEBP/HEIC/HEIF | 30MB |
-| 音频 | WAV/MP3 | 15MB |
+在有意义的里程碑提交，例如：客户锁定方向、批准关键资产、跑通 workflow、完成交付、正式更新
+Skill。项目已采用 Git 时可自动完成低风险本地提交并告知；推送远端必须单独授权。
 
-入库前检查：
+提交前检查：
 
 ```bash
-ffprobe -v error -show_entries format=duration,size,format_name -of default=nw=1 林晚-v1.png
-ffprobe -v error -show_entries stream=codec_name,width,height -of default=nw=1 demo.mp4
+git status --short
+git diff --cached --stat
+git check-ignore -v config.json
 ```
 
-不合格时先转码再入库（示例）：
-
-```bash
-ffmpeg -i input.webm -c:v libx264 -c:a aac output.mp4
-```
-
-默认打包节点未实现素材上传，但校验仍要做：这些资产未来由扩展节点或直调参考 API 时会直接复用。
-
-## 五、提示词引用编号规则
-
-- `@图片1`、`@视频1`、`@音频1` 按本次生成的上传顺序编号，不是按文件在磁盘上的顺序。
-- 每次提交前记录映射，避免串号：
-
-```markdown
-生成日期：2026-08-08 项目A 镜头02
-@图片1 -> characters/林晚-v1-锁脸.png（人物参考（锁脸））
-@图片2 -> scenes/竹林-v1-场景参考.png（场景参考）
-```
-
-- 同一个文件在不同任务中编号可能不同，提交时以本次上传顺序重新编号。
-- 能力边界：默认打包节点未实现素材上传；若本机 ComfyUI 已加载支持上传的扩展节点，
-  按该工作流实际能力执行。上述规则用于参考 API 直调与未来能力方向；
-  默认快速路径提交时按 `prompt-craft.md` 跳过参考素材段。
-
-## 六、资产中心式跨项目复用
-
-把厂商"资产中心"概念落到本地实现：已验证好用的角色/风格/场景沉淀为资产，新项目直接调用，不要每次重新生成。
-
-做法：
-1. 跑通并验收后，把素材 + sidecar 存入对应的 `characters/`、`scenes/`、`styles/`、`props/` 或 `references/`。
-2. 新项目直接引用共享资产目录（或复制到项目对应目录），并在元数据中保留原始出处。
-3. 复用后把效果写回 sidecar 的"复用记录"，持续积累哪些资产可靠。
-
-这比每次都重新生成成本低，也能保证跨项目一致性。
-
-## 七、Git 选择性版本管理
-
-原则：真实 key、输出产物、大体积临时文件不入库；源码、配置示例、workflow JSON、文档、精选示例素材入库。
-
-分类表：
-
-| 类别 | 处理 | 示例 |
-|---|---|---|
-| 入库 | 源码、脚本、文档 | `scripts/`、`references/` |
-| 入库 | 配置示例、workflow JSON | `config.json.example`、`assets/workflow_api_mzsj_video.json` |
-| 入库 | 已授权、小体积的精选素材 | `examples/` 下的示例图 |
-| 不入库 | 真实 key | `config.json`、`*.key` |
-| 不入库 | 输出产物、临时文件 | `output/`、`__pycache__/` |
-| 不入库 | 敏感/未授权素材 | 用户肖像、版权存疑的参考图 |
-| 看情况 | 参考素材 | 授权清楚且体积小时可入库；否则归档在外 |
-| 看情况 | 成片 | 一般归档到项目外或对象存储，git 只存清单 |
-
-仓库已有 `.gitignore`，下面是模板片段，不是强制覆盖：
-
-```gitignore
-# 真实凭据
-config.json
-*.key
-.env
-.env.*
-
-# 本地运行时产物
-output/
-input/
-__pycache__/
-*.pyc
-.DS_Store
-```
-
-选择性 add 与自查：
-
-```bash
-git status                       # 1. 先看全部变更
-git add -f characters/林晚-v1-锁脸.png characters/林晚-v1-锁脸.md
-git check-ignore -v config.json  # 2. 验证敏感文件确实被忽略
-git diff --cached --stat         # 3. 复查暂存内容
-git commit -m "assets(character): add 林晚-v1 参考图"
-```
-
-严禁 `git add .` 盲提；提交信息风格：`assets(类别): 动词 内容`。
-
-大文件处理：成片/大素材放项目外归档目录或对象存储，git 只存清单/索引：
-
-```csv
-date,type,name,path,size,usage
-2026-08-08,finals,brand-02-v1.mp4,/Volumes/Archive/brand/finals/brand-02-v1.mp4,48MB,@视频1
-```
-
-## 八、失败模式与自查清单
-
-| 失败模式 | 规避 |
-|---|---|
-| 文件名含空格/中文 | 中文 OK；空格统一改 `-`；脚本中引用时加引号 |
-| 未校验格式直接上传 | 入库前用 ffprobe 查格式/大小，不合格先转码 |
-| 提示词编号串号 | 每次提交前写映射；同一文件按本次顺序重排 |
-| 把 key 提交 | `config.json` 永不 add；提交前 `git status` + `git check-ignore -v` |
-| 未确认授权就入库 | 肖像/版权素材先记录授权，未确认不入库 |
-| 草稿混入资产 | 一次性草稿放临时目录，验收后再入库 |
-
-自查清单（入库前逐项打勾）：
-- [ ] 文件名符合 `类别-名称-版本-用途`
-- [ ] sidecar 五项元数据齐全
-- [ ] 格式与大小通过上游约束校验
-- [ ] 授权/敏感字段已填写
-- [ ] `git status` 只包含计划提交的路径
-- [ ] `git check-ignore -v` 确认敏感文件被忽略
-
-## 交叉引用
-
-- references/prompt-craft.md：用途词表、素材编号与参考素材段写法
-- references/prompt-templates.md：含参考素材的提示词模板
-- references/comfyui-workflows.md：执行面、产物路径与提交方式
-- references/quality-control.md：素材校验与结果验收
-- references/production-workflow.md：项目文件组织与交付流程
+不要盲目 `git add .`。大媒体、缓存、失败草稿、真实 key 和未授权素材不应意外进入仓库。

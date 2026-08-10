@@ -1,113 +1,79 @@
-# AI Video Studio (`ai-video-studio`)
+# AI Video Studio
 
-A video production **Agent Skill** package for working with a local ComfyUI. It organizes production around four reusable cores:
+An open Skill/Plugin that teaches an existing agent how to make videos. It does not implement another app, CLI product,
+agent runtime, or general orchestrator: the host agent (Codex by default) already understands the customer, invokes tools,
+and delivers the work.
 
-| Core | Role |
-|---|---|
-| Agent | Creative brain: parses the brief, locks direction, plans shots, coordinates execution, reviews results |
-| Skill | Reusable process and knowledge: `SKILL.md`, `references/`, and `scripts/` |
-| Assets | Reusable characters, scenes, styles, and references across projects |
-| ComfyUI | Operation/execution/technical workflow canvas: nodes, API-format workflow JSON, and the `/prompt` API |
+## Core model
 
-ComfyUI is the execution canvas, not the whole workflow. The three-stage path `prompt enhancement → first-frame image → video generation` remains as a **quick path** for one-shot first versions; formal production follows the Agent-driven workflow in `skills/ai-video-studio/references/production-workflow.md`.
+- **Agent** — operator: understand the goal, choose the next step, inspect, revise, and deliver.
+- **Skill** — reusable production methods, judgment criteria, and corrections.
+- **Assets** — inputs, visible outputs, lineage, versions, and customer decisions.
+- **ComfyUI** — the workflow-as-code workbench, execution surface, and technical debugger.
 
-> [中文文档](README.zh-CN.md)
-
-## Capabilities
-
-- **Agent-driven production**: brief → research → creative direction → script/storyboard → execution → QC → skill evolution (documented under `references/`)
-- **Reusable assets**: characters/scenes/styles with sidecar metadata, reuse-first across projects
-- **ComfyUI workflow canvas**: ship, select, or edit API-format workflow JSON; run any workflow via script or UI
-- **Your own keys**: API keys live in local node `config.json` files; no credentials are bundled
-- **Quick path**: one sentence in, a short first version out, for rough cuts
-
-## Quick start
-
-1. ComfyUI running on `http://127.0.0.1:8188` (Comfy Desktop or headless)
-2. Install nodes: copy `assets/comfyui-nodes/comfyui-mzsj-api` and `comfyui-huoshen-image` into ComfyUI's `custom_nodes/`
-3. Configure keys: copy each node's `config.json.example` to `config.json` and fill in keys (see [CONNECTORS.md](CONNECTORS.md))
-4. Initialize a project:
-
-```bash
-bash skills/ai-video-studio/scripts/init-project.sh <project-dir>
-```
-
-Before spending model time, verify that the selected workflow matches the live ComfyUI instance:
-
-```bash
-python3 skills/ai-video-studio/scripts/workflow-doctor.py <workflow.json>
-```
-
-This creates `project.md`, a `.gitignore`, and directories for source material, reusable assets, storyboards, workflows, shots, audio, finals, and run records.
-
-5. Run a specific API-format workflow:
-
-```bash
-python3 skills/ai-video-studio/scripts/run-workflow.py \
-  assets/workflow_api_mzsj_video_text.json \
-  --project <project-dir> \
-  --set '1.inputs.prompt="..."' \
-  --dry-run
-```
-
-`--dry-run` validates and prints the workflow without submitting. Remove it to submit via ComfyUI `/prompt`, poll to completion, and record `workflow.json`, `history.json`, and `run.json` under `<project-dir>/runs/<run-name>/`. For other workflows, inspect their JSON to identify adjustable node fields.
-
-6. Text-to-video quick path:
-
-```bash
-bash skills/ai-video-studio/scripts/make-video.sh "rainy neon street, cyberpunk" \
-  --duration 5 --resolution 720p
-```
-
-The script health-checks ComfyUI, auto-starts it if down, injects parameters, submits text-to-video, polls, and opens the result.
-
-Optional env overrides: `COMFY_SERVER`, `COMFY_WORKFLOW_TPL`, `COMFY_PYTHON`, `COMFY_OUTPUT_DIR`, `COMFY_ROOT`.
+The customer talks to the agent. The agent normally creates the lowest-cost visible artifact that resolves the current
+uncertainty—a direction image, key frame, or test clip—then continues from customer feedback. ComfyUI opens when the
+customer wants technical detail or manual control. A workflow is a tool, not the product menu.
 
 ## Contents
 
-| Path | What |
-|---|---|
-| `skills/ai-video-studio/SKILL.md` | Agent Skill entry: capabilities, default production path, quick path, cost discipline |
-| `skills/ai-video-studio/agents/openai.yaml` | Skill UI metadata for Codex-compatible hosts |
-| `skills/.../references/` | Production workflow, prompt craft/templates, ComfyUI operations, asset management, long video, QC, skill evolution |
-| `skills/.../scripts/init-project.sh` | Project skeleton generator |
-| `skills/.../scripts/make-video.sh` | One-line text-to-video quick path (self-healing) |
-| `skills/.../scripts/run-workflow.py` | Generic API workflow submit + poll, records runs under `<project>/runs/` |
-| `skills/.../scripts/workflow-doctor.py` | Preflight workflow structure, custom nodes, and model/enum resources |
-| `skills/.../assets/` | Standalone Skill copies of the quick-path workflow and project template |
-| `assets/workflow_api_mzsj_video_text.json` | Current text-to-video quick-path template |
-| `assets/workflow_api_mzsj_video.json` | Legacy three-stage template; current HTTPS-image gateway rejects its local IMAGE/data URL |
-| `assets/project-template/` | Plugin-level mirror of the project template |
-| `examples/workflows/` | Curated API-format workflow library — see its [README](examples/workflows/README.md) |
-| `assets/comfyui-nodes/` | Two custom node packs (source) + `config.json.example` |
-| `.qoder-plugin/plugin.json` | Qoder plugin manifest |
-| `CONNECTORS.md` | Which API keys are needed and where to put them |
+```text
+skills/ai-video-studio/
+  SKILL.md                    platform-neutral production method
+  references/                production, assets, QC, ComfyUI, and host mappings
+  scripts/init-project.sh    minimal durable project facts
+  scripts/run-workflow.py    generic API workflow execution and factual run records
+  scripts/workflow-doctor.py preflight node/resource checks
+  assets/                     distributable templates, provider/profile, project template
+assets/comfyui-nodes/         ComfyUI custom nodes
+examples/workflows/           research policy; no unlicensed third-party JSON redistribution
+```
 
-## Installation
+## Use
 
-- **Qoder**: install the whole directory as a plugin (`.qoder-plugin/plugin.json`)
-- **Other agent platforms** (Claude Code / Cursor / Codex / ...): copy `skills/ai-video-studio/` into the platform's skills directory (open SKILL.md format)
-- **ComfyUI only**: copy the two node packs from `assets/comfyui-nodes/` into `custom_nodes/`, configure keys, done
+After installation, tell the agent:
 
-## Limitations
+> Use `$ai-video-studio`. Start with one visible result that lets me judge the direction, then continue from my feedback.
 
-- `make-video.sh` auto-start/open behavior targets macOS (`open` and default install paths); Linux support for the one-line path is on the roadmap
-- The current `/v1/videos` gateway accepts HTTPS image URLs through `first_frame_url`, `last_frame_url`, and `reference_image_urls`. Local IMAGE/data URLs only apply to `api_mode=legacy`; temporary public URLs require explicit user authorization
-- Generation runs on third-party API platforms; their pricing and terms apply. This package only provides technical integration.
+For a durable project, the agent may initialize:
 
-## Provenance
+```bash
+bash skills/ai-video-studio/scripts/init-project.sh ./my-video --name "My Video" --git
+```
 
-- Skills and nodes were developed on a local Mac. Offline validation, live node preflight, and successful H3 first/last-frame runs are recorded separately; curated workflows still require per-machine preflight
-- Prompt methodology is a distilled summary of vendor manuals and the vendor app's built-in agent knowledge; original text remains copyrighted by its owners and is not redistributed here
-- Logo is a locally generated SVG
+This creates only `project.md`, `assets.md`, `decisions.md`, `workflows/`, and `.gitignore`. Other directories appear
+only when work produces them.
 
-## Related ecosystem
+The agent can execute any ComfyUI API workflow internally:
 
-This project believes the real value of agent tooling is a stock of high-quality, ready-to-use workflows and skills:
+```bash
+python3 skills/ai-video-studio/scripts/workflow-doctor.py workflow.json
+python3 skills/ai-video-studio/scripts/run-workflow.py workflow.json \
+  --project ./my-video --set '1.inputs.prompt="rainy street"' --dry-run
+```
 
-- **Workflows**: see `examples/workflows/` — 16 curated API-format references; inclusion does not imply local runtime readiness, credited to [Lesilva/comfyui-workflows](https://github.com/Lesilva/comfyui-workflows)
-- **Skills**: the open SKILL.md standard works across Claude Code / Codex / Gemini CLI / Cursor / Qoder and more. Good starting points: [VoltAgent/awesome-agent-skills](https://github.com/VoltAgent/awesome-agent-skills) (1000+ curated skills) and [awesome-claude-code-skills](https://github.com/helloianneo/awesome-claude-code-skills) (scene-based picks)
+Removing `--dry-run` submits the workflow. These commands are deterministic internal tools, not the customer interface.
 
-## License
+## Configuration and capability
 
-MIT (see [LICENSE](LICENSE)).
+The project separates model capability, provider API contract, and deployment profile. A distributable workflow has a
+manifest. Real API keys stay in local `config.json`; only examples are published. The current MZSJ `/v1/videos` adapter
+accepts HTTPS image URLs. Legacy data-URL behavior must be selected explicitly and is a different contract.
+
+Workflow selection depends on current `object_info`, provider/profile, license, and verification status. External JSON
+enters the public verified library only after its redistribution license, dependencies, and evidence are known.
+
+## Verification scope
+
+Validated: Skill structure, Shell/Python/JSON, minimal project initialization, runner dry-run/mock paths, workflow doctor,
+and live ComfyUI node/enum preflight for the bundled text template. The `/v1/videos` adapter payload/download behavior
+was mock-validated against the current contract supplied by the user, but no new paid generation ran through this exact
+template, so its manifest says `dry-run`, not end-to-end `live-tested`.
+
+## Install
+
+- Codex: copy the full `skills/ai-video-studio/` directory into a discoverable Skills directory.
+- Qoder: install the repository through `.qoder-plugin/plugin.json`, or copy the Skill.
+- Other `SKILL.md` hosts: copy the Skill and map semantic actions to their own file, terminal, and multimodal tools.
+
+The Qoder manifest is compatibility packaging; it is not a second agent runtime.
