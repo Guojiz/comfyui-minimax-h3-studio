@@ -20,7 +20,7 @@ ComfyUI 是本技能的**操作面/执行面/技术工作流画布**：
 |---|---|---|
 | 提示词增强 | DeepSeekPromptEnhance | 用 LLM 把一句话扩成 H3 规范提示词 |
 | 首帧生图 | HuoshenImageGenerate | 生成首帧图片（默认 1536x1024） |
-| 文生/图生视频 | MzsjVideoGenerate | 文生视频；可选接首帧、尾帧或单张参考图 IMAGE 输入 |
+| 文生/图生视频 | MzsjVideoGenerate | 文生视频；当前网关用 HTTPS 首帧、尾帧或参考图 URL |
 
 默认打包节点未暴露（不是整个 Studio 不支持）：
 
@@ -29,9 +29,9 @@ ComfyUI 是本技能的**操作面/执行面/技术工作流画布**：
 - 视频/音频精准编辑（替换、局部修改、背景替换、台词替换等）
 - 单次生成长视频
 
-说明：打包节点已经定义 `first_frame`、`last_frame`、`reference_image` 可选输入，但现成
-三段式模板只连接 `first_frame`。首尾帧或单参考图路径需要在 ComfyUI 中接入相应 IMAGE
-上游节点，并对真实服务做一次小任务验证后再批量使用。
+说明：当前 `/v1/videos` 网关要求 HTTPS 图片地址，使用 `first_frame_url`、`last_frame_url`、
+`reference_image_urls`；本地 IMAGE/data URL 仅供 `api_mode=legacy` 的旧网关。公开临时图片前
+先确认授权，并对首尾帧路径做一次小任务验证后再批量使用。
 
 Studio 层：本机 ComfyUI 可加载任意已安装节点与工作流；首尾帧、参考素材、
 精准编辑等可由其他 Comfy workflow 或扩展节点实现，本 Skill 不限制实例能力。
@@ -49,7 +49,8 @@ Studio 层：本机 ComfyUI 可加载任意已安装节点与工作流；首尾�
 | API 格式 JSON | 脚本化、批量、agent 自动化 | `POST /prompt` |
 | UI 画布格式 | 人工实验、调结构、看中间结果 | ComfyUI UI 加载 |
 
-本技能自带三段式模板：Skill 内 `assets/workflow_api_mzsj_video.json`（节点 1 增强 → 节点 2 生图 → 节点 3 视频）；完整插件的根 `assets/` 下另有镜像。
+本技能自带文生快速模板 `assets/workflow_api_mzsj_video_text.json`（提示词导演 → 文生视频）。
+旧 `workflow_api_mzsj_video.json` 保留作兼容参考，但其本地 IMAGE/data URL 路径不适用于当前网关。
 
 `examples/workflows/` 是精选 API 格式工作流库，四类用途：
 
@@ -60,9 +61,19 @@ Studio 层：本机 ComfyUI 可加载任意已安装节点与工作流；首尾�
 | upscale/ | Kontext 等放大修复 | 无损放大、高清还原 |
 | product/ | 人物一致性、换衣、产品打光/背景 | 换姿势、一键换衣、电商打光 |
 
-这些是可供复用的技术工作流画布；使用前按 `examples/workflows/README.md` 准备缺失节点与模型。
+这些是可移植参考，不代表本机已装好依赖。使用前先运行 `scripts/workflow-doctor.py`，再按
+`examples/workflows/README.md` 准备缺失节点、模型和输入素材。
 
 ## 四、执行方式优先级
+
+### 0. 运行前体检：workflow-doctor.py
+
+```bash
+python3 scripts/workflow-doctor.py <workflow.json>
+```
+
+退出码：`0` 结构/实例检查通过；`1` JSON 结构错误；`2` ComfyUI 不可达；`3` 缺节点或模型/枚举资源。
+`--offline` 只检查 API JSON 结构。体检通过仍不等于显存、输入素材和外部 API 已验证。
 
 ### 1. 任意 API 工作流：run-workflow.py
 
@@ -87,7 +98,7 @@ python3 scripts/run-workflow.py \
 bash scripts/make-video.sh "雨夜霓虹街道，赛博朋克" --duration 5 --resolution 720p
 ```
 
-流程：健康检查 → 注入参数 → 提交 → 轮询 → 打开产物。
+流程：健康检查 → 注入参数 → 文生视频提交 → 轮询 → 打开产物。
 
 参数：
 
@@ -167,8 +178,8 @@ curl -s -m 5 http://127.0.0.1:8188/object_info | grep -o "MzsjVideoGenerate"
 ## 八、安全与成本
 
 - `config.json` 含真实 key：不外传、不入库；仓库只保留 `config.json.example`。
-- 三段式快速路径固定 1 次增强 + 1 次生图 + 1 次视频；其他 workflow 按实际节点计费。单步调试优先用 `--dry-run` 或不提交的检查。
-- 高成本提交前先向用户确认，再执行。
+- 文生快速路径固定 1 次增强 + 1 次视频；旧三段式另含 1 次生图。其他 workflow 按实际节点计费。
+- 按“方向 + shot 表 + 总预算”一次授权；范围内不逐镜头重复确认。
 
 ## 九、自查清单
 

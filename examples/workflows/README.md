@@ -1,8 +1,8 @@
 # Curated Workflow Library / 精选工作流库
 
-A hand-picked set of 16 **API-format** ComfyUI workflows that form the technical workflow canvas of the AI Video Studio Agent Skill. The Agent handles planning, the Skill supplies process and prompt discipline, Assets provide reusable inputs, and these workflows execute. All files are `/prompt`-ready JSON: suitable for scripting, batch runs, agent-driven automation, and manual loading in the ComfyUI UI.
+A hand-picked set of 16 **API-format** ComfyUI workflows that form a portable reference library for the AI Video Studio Agent Skill. Their JSON structure is `/prompt`-ready, but actual execution requires the matching custom nodes, model weights and input assets. Inclusion here does **not** mean the current machine is ready to run them.
 
-中文：精选的 16 个 **API 格式** ComfyUI 工作流，是 AI Video Studio Agent Skill 的技术工作流画布——Agent 负责编排，Skill 提供流程与提示词纪律，资产提供可复用输入，这些 workflow 负责执行。全部为可直接走 `/prompt` 接口的 JSON，适合脚本化、批量、agent 自动化，也可在 ComfyUI UI 中手动加载。
+中文：精选的 16 个 **API 格式** ComfyUI 工作流是可移植参考库。其 JSON 结构可走 `/prompt`，但真实执行仍需对应的自定义节点、模型权重与输入素材；收录不等于本机已经可运行。Agent 必须先体检，再选择执行或换 workflow。
 
 ## Categories / 分类
 
@@ -10,7 +10,7 @@ A hand-picked set of 16 **API-format** ComfyUI workflows that form the technical
 
 | Workflow | Purpose |
 | --- | --- |
-| `Wan2.2极速文生视频KJ版本（已确保跑通）.json` | Fast text-to-video, verified runnable |
+| `Wan2.2极速文生视频KJ版本（已确保跑通）.json` | Fast text-to-video; filename reflects upstream verification, not this machine |
 | `wan2.2文生视频(14B)GGUF适合16G以下显存.json` | Text-to-video for GPUs with ≤16 GB VRAM (GGUF) |
 | `wan2.1 vace首尾帧视频.json` | First-&-last-frame video (pairs well with our first-frame stage) |
 | `视频动作迁移WAN2.1-VACE-14B.json` | Motion transfer from a reference video |
@@ -44,8 +44,8 @@ A hand-picked set of 16 **API-format** ComfyUI workflows that form the technical
 
 ## How to use / 使用方式
 
-1. 用 ComfyUI Manager 安装 workflow 中缺失的自定义节点，并按需准备对应模型权重。
-2. 将 `LoadImage` / `LoadVideo` 节点的占位输入替换为你自己的素材。
+1. 在消耗生成额度前运行：`python3 skills/ai-video-studio/scripts/workflow-doctor.py <file>.json`。
+2. 仅在体检报告通过后安装缺失节点、准备模型权重，并替换 `LoadImage` / `LoadVideo` 占位素材。
 3. 提交执行，三选一：
    - 通用脚本：`python3 skills/ai-video-studio/scripts/run-workflow.py <file>.json --project <project-dir> --set '1.inputs.prompt="..."' --dry-run`；去掉 `--dry-run` 即真实提交并轮询，run 记录在 `<project-dir>/runs/`
    - 一键快速路径：`make-video.sh` 仍用于三段式一句话出片（见插件根 README）
@@ -54,8 +54,8 @@ A hand-picked set of 16 **API-format** ComfyUI workflows that form the technical
 
 English:
 
-1. Install missing custom nodes with ComfyUI Manager and prepare the required model weights.
-2. Replace the placeholder inputs in `LoadImage` / `LoadVideo` nodes with your own material.
+1. Before spending generation time, run `python3 skills/ai-video-studio/scripts/workflow-doctor.py <file>.json`.
+2. Only after the readiness check, install missing nodes, prepare weights, and replace placeholder inputs.
 3. Submit any of these ways:
    - Generic script: `python3 skills/ai-video-studio/scripts/run-workflow.py <file>.json --project <project-dir> --set '1.inputs.prompt="..."' --dry-run`; drop `--dry-run` to submit and poll, with the run recorded under `<project-dir>/runs/`
    - One-line quick path: `make-video.sh` remains available for the three-stage one-shot flow (see plugin root README)

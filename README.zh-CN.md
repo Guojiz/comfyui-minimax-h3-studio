@@ -32,13 +32,19 @@ ComfyUI 是执行画布，不是全部流程。「提示词增强 → 首帧生�
 bash skills/ai-video-studio/scripts/init-project.sh <项目目录>
 ```
 
-生成 `project.md`、`.gitignore` 以及素材、分镜、workflow、镜头、音频、成片和运行记录目录。
+生成 `project.md`、`shots/index.md`、`.gitignore` 以及素材、分镜、workflow、音频、成片和运行记录目录。
+
+运行任何 workflow 前先做实例体检，避免在模型额度窗口内才发现缺节点或模型：
+
+```bash
+python3 skills/ai-video-studio/scripts/workflow-doctor.py <workflow.json>
+```
 
 5. 运行指定 API 格式工作流：
 
 ```bash
 python3 skills/ai-video-studio/scripts/run-workflow.py \
-  assets/workflow_api_mzsj_video.json \
+  assets/workflow_api_mzsj_video_text.json \
   --project <项目目录> \
   --set '1.inputs.prompt="..."' \
   --dry-run
@@ -46,14 +52,14 @@ python3 skills/ai-video-studio/scripts/run-workflow.py \
 
 `--dry-run` 只校验并打印，不提交。去掉它后脚本会提交到 ComfyUI `/prompt`、轮询到终态，并把 `workflow.json`、`history.json`、`run.json` 记录到 `<项目目录>/runs/<run-name>/`。其他 workflow 的可调节点与字段以其 JSON 为准。
 
-6. 一键兼容脚本（快速路径）：
+6. 一键文生快速路径：
 
 ```bash
 bash skills/ai-video-studio/scripts/make-video.sh "雨夜霓虹街道，赛博朋克" \
   --duration 5 --resolution 720p
 ```
 
-脚本会健康检查、服务未启动时自动拉起、注入参数、提交、轮询并打开产物。
+脚本会健康检查、服务未启动时自动拉起、注入参数、文生视频提交、轮询并打开产物。
 
 可选环境变量：`COMFY_SERVER`、`COMFY_WORKFLOW_TPL`、`COMFY_PYTHON`、`COMFY_OUTPUT_DIR`、`COMFY_ROOT`。
 
@@ -65,12 +71,14 @@ bash skills/ai-video-studio/scripts/make-video.sh "雨夜霓虹街道，赛博�
 | `skills/ai-video-studio/agents/openai.yaml` | Codex 等宿主使用的 Skill 界面元数据 |
 | `skills/.../references/` | 生产流程、提示词方法论/模板、ComfyUI 操作、资产管理、长视频、QC、Skill 演进 |
 | `skills/.../scripts/init-project.sh` | 项目骨架生成脚本 |
-| `skills/.../scripts/make-video.sh` | 一句话三段式快速路径脚本（自愈） |
+| `skills/.../scripts/make-video.sh` | 一句话文生视频快速路径脚本（自愈） |
 | `skills/.../scripts/run-workflow.py` | 通用 API 工作流提交 + 轮询，run 记录到 `<项目>/runs/` |
+| `skills/.../scripts/workflow-doctor.py` | 提交前检查 workflow 格式、节点和模型/枚举资源 |
 | `skills/.../assets/` | 随独立 Skill 分发的快速路径 workflow 与项目模板 |
-| `assets/workflow_api_mzsj_video.json` | 三段式 API 格式快速路径模板 |
+| `assets/workflow_api_mzsj_video_text.json` | 当前文生视频快速路径模板 |
+| `assets/workflow_api_mzsj_video.json` | 旧三段式兼容模板；当前 HTTPS 图片网关不接受其本地 IMAGE/data URL |
 | `assets/project-template/` | 插件根中的项目模板镜像 |
-| `examples/workflows/` | 精选 API 格式工作流库（见目录内 [README](examples/workflows/README.md)） |
+| `examples/workflows/` | 精选 API 格式参考库；真实运行前必须体检节点、模型和素材 |
 | `assets/comfyui-nodes/` | 两个自定义节点包源码 + `config.json.example`（不含真实 key） |
 | `.qoder-plugin/plugin.json` | Qoder 插件 manifest |
 | `CONNECTORS.md` | 需要配置哪些 API key、放在哪里 |
@@ -97,7 +105,7 @@ bash skills/ai-video-studio/scripts/make-video.sh "雨夜霓虹街道，赛博�
 
 agent 工具的真正价值在于拥有一定量现成、高质量的 workflow 与 skill：
 
-- **Workflow**：见 `examples/workflows/` ——精选 16 个 API 格式工作流，来源 [Lesilva/comfyui-workflows](https://github.com/Lesilva/comfyui-workflows)
+- **Workflow**：见 `examples/workflows/` ——精选 16 个 API 格式参考工作流；收录不代表本机可运行，来源 [Lesilva/comfyui-workflows](https://github.com/Lesilva/comfyui-workflows)
 - **Skill**：SKILL.md 开放标准已被 Claude Code / Codex / Gemini CLI / Cursor / Qoder 等 20+ 平台支持。推荐入口：[VoltAgent/awesome-agent-skills](https://github.com/VoltAgent/awesome-agent-skills)（1000+ 精选）、[awesome-claude-code-skills](https://github.com/helloianneo/awesome-claude-code-skills)（按场景精选）
 
 ## License

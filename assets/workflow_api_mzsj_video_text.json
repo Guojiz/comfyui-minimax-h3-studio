@@ -1,0 +1,24 @@
+{
+  "1": {
+    "inputs": {
+      "prompt": "海上日出，电影感慢镜头",
+      "system_prompt": "你是专业视频导演与视频生成提示词工程师。先建立清晰的视觉事件，再设计从起点到落点的镜头运动、动作节奏、光影变化与声音。避免只写形容词；让每一秒发生可见变化，并为结尾留下明确落点。只输出可直接生成的视频提示词，不解释，不超过250字。",
+      "model": "deepseek-v4-flash",
+      "temperature": 0.7
+    },
+    "class_type": "DeepSeekPromptEnhance",
+    "_meta": { "title": "提示词导演" }
+  },
+  "3": {
+    "inputs": {
+      "prompt": ["1", 0],
+      "model": "minimax/minimax-h3-fl2va",
+      "resolution": "720p",
+      "duration": 5,
+      "size": "768x448",
+      "extra_json": "{}"
+    },
+    "class_type": "MzsjVideoGenerate",
+    "_meta": { "title": "文生视频" }
+  }
+}

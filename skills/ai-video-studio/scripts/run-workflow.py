@@ -66,6 +66,8 @@ def build_parser():
         help="项目目录，run 保存到 <project>/runs/（默认当前目录）",
     )
     parser.add_argument("--run-name", default=None, help="run 目录名（默认自动生成）")
+    parser.add_argument("--shot", default=None, help="关联的镜头 ID，例如 s03")
+    parser.add_argument("--iteration", default=None, help="镜头迭代版本，例如 v1")
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -169,6 +171,17 @@ def normalize_run_name(name):
     if "/" in name or "\\" in name:
         raise UsageError("--run-name 不能包含路径分隔符")
     return name
+
+
+def normalize_label(value, option):
+    if value is None:
+        return None
+    value = value.strip()
+    if not value or value in (".", ".."):
+        raise UsageError(f"{option} 不能为空、. 或 ..")
+    if "/" in value or "\\" in value:
+        raise UsageError(f"{option} 不能包含路径分隔符")
+    return value
 
 
 def poll_history(server, prompt_id, timeout, interval):
@@ -285,9 +298,14 @@ def view_url(server, artifact):
 def run(args):
     workflow = load_workflow(args.workflow)
     apply_sets(workflow, args.set)
+    shot_id = normalize_label(args.shot, "--shot")
+    iteration = normalize_label(args.iteration, "--iteration")
+    default_prefix = "-".join(part for part in (shot_id, iteration) if part)
+    if default_prefix:
+        default_prefix += "-"
     run_name = normalize_run_name(
         args.run_name
-        or f"run-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
+        or f"{default_prefix}run-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
     )
     run_dir = Path(args.project).expanduser() / "runs" / run_name
     if args.dry_run:
@@ -299,8 +317,10 @@ def run(args):
 
     run_dir.mkdir(parents=True, exist_ok=True)
     meta = {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_name": run_name,
+        "shot_id": shot_id,
+        "iteration": iteration,
         "server": args.server,
         "workflow_file": args.workflow,
         "sets": list(args.set),

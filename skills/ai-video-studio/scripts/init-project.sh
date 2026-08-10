@@ -16,8 +16,8 @@ usage() {
   cat <<'EOF'
 用法: init-project.sh [项目目录] [--name "项目标题"] [--git] [--dry-run]
 
-创建 project.md、source、brief-and-story、characters、scenes、styles、props、
-references、storyboards、workflows、shots、audio、final、runs 目录，以及适合媒体项目的 .gitignore。
+创建 project.md、shots/index.md、source、brief-and-story、characters、scenes、styles、props、
+references、storyboards、workflows、audio、final、runs 目录，以及适合媒体项目的 .gitignore。
 
 选项:
   --name NAME   在新建的 project.md 中填入项目标题（默认取目录名）
@@ -93,6 +93,12 @@ else
   run_or_dry cp "$TPL_DIR/.gitignore" "$PROJECT_DIR/.gitignore"
 fi
 
+if [ -e "$PROJECT_DIR/shots/index.md" ]; then
+  log "保留已有 shots/index.md: $PROJECT_DIR/shots/index.md"
+else
+  run_or_dry cp "$TPL_DIR/shots/index.md" "$PROJECT_DIR/shots/index.md"
+fi
+
 if [ "$CREATED_PROJECT_MD" = 1 ] && [ "$DO_DRY" = 0 ]; then
   TMP_MD="$(mktemp "${TMPDIR:-/tmp}/init-project.XXXXXX")"
   while IFS= read -r line; do
@@ -117,6 +123,6 @@ log "项目骨架: $PROJECT_DIR"
 for d in $DIRS; do
   log "  $d/"
 done
-log "文件: project.md, .gitignore"
+log "文件: project.md, shots/index.md, .gitignore"
 if [ "$DO_GIT" = 1 ]; then log "Git: 已初始化"; fi
 if [ "$DO_DRY" = 1 ]; then log "（dry-run：未写入任何内容）"; fi

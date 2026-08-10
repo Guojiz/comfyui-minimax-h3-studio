@@ -94,7 +94,7 @@ ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -of d
 
 ## 六、验收标准
 
-交付前先和用户确认"完成"定义：几条镜头、时长、分辨率、必含/必不含元素、是否要声音。
+以方向阶段已确认的 shot 表为“完成”定义：镜头数、时长、分辨率、必含/必不含元素与声音要求。
 
 输出文件命名：`项目-镜头-版本`，示例：
 

@@ -139,6 +139,10 @@ class MzsjVideoGenerate:
                 "duration": ("INT", {"default": 5, "min": 2, "max": 15, "step": 1}),
             },
             "optional": {
+                "size": ("STRING", {"default": "768x448"}),
+                "first_frame_url": ("STRING", {"default": ""}),
+                "last_frame_url": ("STRING", {"default": ""}),
+                "reference_image_urls": ("STRING", {"multiline": True, "default": ""}),
                 "first_frame": ("IMAGE",),
                 "last_frame": ("IMAGE",),
                 "reference_image": ("IMAGE",),
@@ -152,7 +156,8 @@ class MzsjVideoGenerate:
     CATEGORY = "mzsj-api"
     OUTPUT_NODE = True
 
-    def generate(self, prompt, model, resolution, duration,
+    def generate(self, prompt, model, resolution, duration, size="768x448",
+                 first_frame_url="", last_frame_url="", reference_image_urls="",
                  first_frame=None, last_frame=None, reference_image=None,
                  extra_json="{}"):
         cfg = _load_config().get("mzsj", {})
@@ -162,19 +167,43 @@ class MzsjVideoGenerate:
         if not api_key:
             raise RuntimeError("缺少 mzsjai API Key，请编辑 comfyui-mzsj-api/config.json")
 
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "resolution": resolution,
-            "duration": duration,
-        }
-        # 图生视频素材（字段名若与平台不符，可用 extra_json 覆盖）
-        if first_frame is not None:
-            payload["first_frame_image"] = _image_to_data_url(first_frame)
-        if last_frame is not None:
-            payload["last_frame_image"] = _image_to_data_url(last_frame)
-        if reference_image is not None:
-            payload["reference_images"] = [_image_to_data_url(reference_image)]
+        api_mode = str(cfg.get("api_mode", "videos")).lower()
+        image_urls = [url.strip() for url in (first_frame_url, last_frame_url) if url.strip()]
+        image_urls.extend(line.strip() for line in reference_image_urls.splitlines() if line.strip())
+        if api_mode == "videos":
+            if any(value is not None for value in (first_frame, last_frame, reference_image)):
+                raise RuntimeError(
+                    "当前 /v1/videos 网关要求 HTTPS 图片地址；请使用 first_frame_url、"
+                    "last_frame_url 或 reference_image_urls。不要把本地 IMAGE/data URL 直接提交。"
+                )
+            bad_urls = [url for url in image_urls if not url.startswith("https://")]
+            if bad_urls:
+                raise RuntimeError("参考图片必须是 HTTPS 地址")
+            payload = {
+                "model": model,
+                "prompt": prompt,
+                "seconds": duration,
+                "size": size or ("1280x720" if resolution == "1080p" else "768x448"),
+            }
+            if image_urls:
+                payload["images"] = image_urls
+            submit_path = "/v1/videos"
+        else:
+            payload = {
+                "model": model,
+                "prompt": prompt,
+                "resolution": resolution,
+                "duration": duration,
+            }
+            if first_frame is not None:
+                payload["first_frame_image"] = _image_to_data_url(first_frame)
+            if last_frame is not None:
+                payload["last_frame_image"] = _image_to_data_url(last_frame)
+            if reference_image is not None:
+                payload["reference_images"] = [_image_to_data_url(reference_image)]
+            if image_urls:
+                payload["images"] = image_urls
+            submit_path = "/v1/video/generations"
         try:
             payload.update(json.loads(extra_json or "{}"))
         except json.JSONDecodeError:
@@ -185,7 +214,7 @@ class MzsjVideoGenerate:
         # 1) 提交任务（提交响应为扁平结构，无需解包）
         try:
             task = _http_json(
-                f"{base_url}/v1/video/generations",
+                f"{base_url}{submit_path}",
                 method="POST", headers=headers, data=payload, timeout=120,
             )
         except urllib.error.HTTPError as e:
@@ -208,7 +237,7 @@ class MzsjVideoGenerate:
             time.sleep(int(cfg.get("poll_interval_seconds", 8)))
             try:
                 task = _unwrap_task(_http_json(
-                    f"{base_url}/v1/video/generations/{task_id}",
+                    f"{base_url}{submit_path}/{task_id}",
                     headers=headers, timeout=60,
                 ))
             except urllib.error.HTTPError as e:
@@ -217,7 +246,9 @@ class MzsjVideoGenerate:
             print(f"[MzsjVideo] {task_id} -> {status}")
 
         # 3) 下载视频到 output 目录（优先 result_url，其次常见字段）
-        video_url = task.get("result_url") or task.get("video_url") or task.get("url")
+        video_url = task.get("content_url") or task.get("result_url") or task.get("video_url") or task.get("url")
+        if not video_url and isinstance(task.get("metadata"), dict):
+            video_url = task["metadata"].get("url")
         if not video_url:
             for key in ("output", "result", "data", "video"):
                 v = task.get(key)
@@ -231,7 +262,10 @@ class MzsjVideoGenerate:
         if isinstance(video_url, str) and not video_url.startswith("http"):
             video_url = base_url + video_url
         if not video_url:
-            raise RuntimeError(f"未找到视频地址: {json.dumps(task, ensure_ascii=False)[:800]}")
+            if api_mode == "videos":
+                video_url = f"{base_url}{submit_path}/{task_id}/content"
+            else:
+                raise RuntimeError(f"未找到视频地址: {json.dumps(task, ensure_ascii=False)[:800]}")
 
         out_dir = os.path.join(folder_paths.get_output_directory(), "mzsj")
         os.makedirs(out_dir, exist_ok=True)
@@ -241,7 +275,10 @@ class MzsjVideoGenerate:
         with urllib.request.urlopen(req, timeout=300) as resp, open(full_path, "wb") as f:
             f.write(resp.read())
         print(f"[MzsjVideo] 已保存: {full_path}")
-        return (filename, full_path)
+        return {
+            "ui": {"video_paths": [full_path], "video_filenames": [filename]},
+            "result": (filename, full_path),
+        }
 
 
 NODE_CLASS_MAPPINGS = {

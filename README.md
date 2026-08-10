@@ -32,13 +32,19 @@ ComfyUI is the execution canvas, not the whole workflow. The three-stage path `p
 bash skills/ai-video-studio/scripts/init-project.sh <project-dir>
 ```
 
+Before spending model time, verify that the selected workflow matches the live ComfyUI instance:
+
+```bash
+python3 skills/ai-video-studio/scripts/workflow-doctor.py <workflow.json>
+```
+
 This creates `project.md`, a `.gitignore`, and directories for source material, reusable assets, storyboards, workflows, shots, audio, finals, and run records.
 
 5. Run a specific API-format workflow:
 
 ```bash
 python3 skills/ai-video-studio/scripts/run-workflow.py \
-  assets/workflow_api_mzsj_video.json \
+  assets/workflow_api_mzsj_video_text.json \
   --project <project-dir> \
   --set '1.inputs.prompt="..."' \
   --dry-run
@@ -46,14 +52,14 @@ python3 skills/ai-video-studio/scripts/run-workflow.py \
 
 `--dry-run` validates and prints the workflow without submitting. Remove it to submit via ComfyUI `/prompt`, poll to completion, and record `workflow.json`, `history.json`, and `run.json` under `<project-dir>/runs/<run-name>/`. For other workflows, inspect their JSON to identify adjustable node fields.
 
-6. Quick path with the compatible one-line script:
+6. Text-to-video quick path:
 
 ```bash
 bash skills/ai-video-studio/scripts/make-video.sh "rainy neon street, cyberpunk" \
   --duration 5 --resolution 720p
 ```
 
-The script health-checks ComfyUI, auto-starts it if down, injects parameters, submits, polls, and opens the result.
+The script health-checks ComfyUI, auto-starts it if down, injects parameters, submits text-to-video, polls, and opens the result.
 
 Optional env overrides: `COMFY_SERVER`, `COMFY_WORKFLOW_TPL`, `COMFY_PYTHON`, `COMFY_OUTPUT_DIR`, `COMFY_ROOT`.
 
@@ -65,10 +71,12 @@ Optional env overrides: `COMFY_SERVER`, `COMFY_WORKFLOW_TPL`, `COMFY_PYTHON`, `C
 | `skills/ai-video-studio/agents/openai.yaml` | Skill UI metadata for Codex-compatible hosts |
 | `skills/.../references/` | Production workflow, prompt craft/templates, ComfyUI operations, asset management, long video, QC, skill evolution |
 | `skills/.../scripts/init-project.sh` | Project skeleton generator |
-| `skills/.../scripts/make-video.sh` | One-line three-stage quick path (self-healing) |
+| `skills/.../scripts/make-video.sh` | One-line text-to-video quick path (self-healing) |
 | `skills/.../scripts/run-workflow.py` | Generic API workflow submit + poll, records runs under `<project>/runs/` |
+| `skills/.../scripts/workflow-doctor.py` | Preflight workflow structure, custom nodes, and model/enum resources |
 | `skills/.../assets/` | Standalone Skill copies of the quick-path workflow and project template |
-| `assets/workflow_api_mzsj_video.json` | Three-stage API-format quick-path template |
+| `assets/workflow_api_mzsj_video_text.json` | Current text-to-video quick-path template |
+| `assets/workflow_api_mzsj_video.json` | Legacy three-stage template; current HTTPS-image gateway rejects its local IMAGE/data URL |
 | `assets/project-template/` | Plugin-level mirror of the project template |
 | `examples/workflows/` | Curated API-format workflow library — see its [README](examples/workflows/README.md) |
 | `assets/comfyui-nodes/` | Two custom node packs (source) + `config.json.example` |
@@ -84,12 +92,12 @@ Optional env overrides: `COMFY_SERVER`, `COMFY_WORKFLOW_TPL`, `COMFY_PYTHON`, `C
 ## Limitations
 
 - `make-video.sh` auto-start/open behavior targets macOS (`open` and default install paths); Linux support for the one-line path is on the roadmap
-- The default three-stage template only connects an automatically generated first frame. The bundled video node also exposes last-frame and single-reference-image inputs, but they require an IMAGE-producing upstream node and a small compatibility test. Video/audio multimodal reference and precise editing require another node or workflow
+- The current `/v1/videos` gateway accepts HTTPS image URLs through `first_frame_url`, `last_frame_url`, and `reference_image_urls`. Local IMAGE/data URLs only apply to `api_mode=legacy`; temporary public URLs require explicit user authorization
 - Generation runs on third-party API platforms; their pricing and terms apply. This package only provides technical integration.
 
 ## Provenance
 
-- Skills and nodes were developed and verified end-to-end on a local Mac (ComfyUI v0.30.2 / Comfy Desktop 1.0.37)
+- Skills and nodes were developed on a local Mac. Offline validation, live node preflight, and successful H3 first/last-frame runs are recorded separately; curated workflows still require per-machine preflight
 - Prompt methodology is a distilled summary of vendor manuals and the vendor app's built-in agent knowledge; original text remains copyrighted by its owners and is not redistributed here
 - Logo is a locally generated SVG
 
@@ -97,7 +105,7 @@ Optional env overrides: `COMFY_SERVER`, `COMFY_WORKFLOW_TPL`, `COMFY_PYTHON`, `C
 
 This project believes the real value of agent tooling is a stock of high-quality, ready-to-use workflows and skills:
 
-- **Workflows**: see `examples/workflows/` — 16 curated API-format workflows, credited to [Lesilva/comfyui-workflows](https://github.com/Lesilva/comfyui-workflows)
+- **Workflows**: see `examples/workflows/` — 16 curated API-format references; inclusion does not imply local runtime readiness, credited to [Lesilva/comfyui-workflows](https://github.com/Lesilva/comfyui-workflows)
 - **Skills**: the open SKILL.md standard works across Claude Code / Codex / Gemini CLI / Cursor / Qoder and more. Good starting points: [VoltAgent/awesome-agent-skills](https://github.com/VoltAgent/awesome-agent-skills) (1000+ curated skills) and [awesome-claude-code-skills](https://github.com/helloianneo/awesome-claude-code-skills) (scene-based picks)
 
 ## License

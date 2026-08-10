@@ -6,10 +6,10 @@ set -euo pipefail
 
 SERVER="${COMFY_SERVER:-http://127.0.0.1:8188}"
 # 默认使用 Skill 自带模板，单独安装 Skill 时也可运行；可用 COMFY_WORKFLOW_TPL 覆盖。
-WORKFLOW_TPL="${COMFY_WORKFLOW_TPL:-$(cd "$(dirname "$0")/.." && pwd)/assets/workflow_api_mzsj_video.json}"
+WORKFLOW_TPL="${COMFY_WORKFLOW_TPL:-$(cd "$(dirname "$0")/.." && pwd)/assets/workflow_api_mzsj_video_text.json}"
 PY="${COMFY_PYTHON:-$HOME/ComfyUI-Installs/ComfyUI/standalone-env/bin/python3.13}"
 [ -x "$PY" ] || PY=python3
-OUTPUT_DIR="${COMFY_OUTPUT_DIR:-$HOME/ComfyUI-Installs/ComfyUI/ComfyUI/output}"
+OUTPUT_DIR="${COMFY_OUTPUT_DIR:-$HOME/ComfyUI-Shared/output}"
 
 PROMPT=""
 DURATION=5
@@ -39,7 +39,8 @@ import json, sys
 tpl, out, prompt, dur, res, size = sys.argv[1:7]
 wf = json.load(open(tpl))
 wf["1"]["inputs"]["prompt"] = prompt
-wf["2"]["inputs"]["size"] = size
+if "2" in wf and "size" in wf["2"].get("inputs", {}):
+    wf["2"]["inputs"]["size"] = size
 wf["3"]["inputs"]["duration"] = int(dur)
 wf["3"]["inputs"]["resolution"] = res
 json.dump(wf, open(out, "w"), ensure_ascii=False)
@@ -56,7 +57,7 @@ if ! curl -s -m 5 "$SERVER/object_info" | grep -q "MzsjVideoGenerate"; then
     --enable-manager \
     --extra-model-paths-config "$HOME/Library/Application Support/Comfy Desktop/shared_model_paths.yaml" \
     --input-directory "$HOME/ComfyUI-Shared/input" \
-    --output-directory "$HOME/ComfyUI-Shared/output" \
+    --output-directory "$OUTPUT_DIR" \
     --port "$PORT" >> "$HOME/Library/Logs/comfyui-headless.log" 2>&1 &
   READY=0
   for _ in $(seq 1 60); do
