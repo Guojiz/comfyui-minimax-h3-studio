@@ -46,7 +46,11 @@ def read_run_meta(run_dir):
 
 
 def read_run_dir(project, run_id):
-    run_dir = Path(project).expanduser() / "runs" / run_id
+    project_root = Path(project).expanduser().resolve()
+    run_dir = (project_root / "runs" / run_id).resolve()
+    runs_root = (project_root / "runs").resolve()
+    if not run_dir.is_relative_to(runs_root):
+        raise LookupError(f"run id {run_id!r} escapes the project runs directory")
     if not run_dir.is_dir():
         raise LookupError(f"run {run_id!r} not found under {project}/runs")
     return run_dir
@@ -69,16 +73,22 @@ def idempotency_key(instance_id, workflow, sets, seed, intended_run):
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
-def http_json(url, method="GET", payload=None, timeout=10, headers=None):
+def http_json(url, method="GET", payload=None, timeout=10, headers=None, max_bytes=None):
     data = None
     request_headers = dict(headers or {})
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         request_headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=request_headers, method=method)
+    limit = max_bytes if max_bytes is not None else 128 * 1024 * 1024
+    expected = _expected_netloc(url)
+    opener = urllib.request.build_opener(SameHostRedirectHandler(expected))
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            raw = response.read().decode("utf-8", errors="replace")
+        with opener.open(request, timeout=timeout) as response:
+            raw_bytes = response.read(limit + 1)
+            if len(raw_bytes) > limit:
+                raise RuntimeError(f"response exceeds {limit} byte cap from {url}")
+            raw = raw_bytes.decode("utf-8", errors="replace")
             if not raw.strip():
                 return {}
             try:
@@ -92,6 +102,89 @@ def http_json(url, method="GET", payload=None, timeout=10, headers=None):
         raise RuntimeError(f"cannot connect {url}: {error.reason}")
     except (TimeoutError, OSError) as error:
         raise RuntimeError(f"request failed {url}: {error}")
+
+
+class SameHostRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Block redirects that leave the expected origin host."""
+
+    def __init__(self, expected_host):
+        super().__init__()
+        self.expected_host = expected_host
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new_request = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new_request is None:
+            return None
+        host = urllib.parse.urlsplit(new_request.full_url).netloc
+        if host != self.expected_host:
+            raise RuntimeError(
+                f"redirect blocked to a different host ({new_request.full_url}); "
+                "artifact downloads must stay on the selected instance"
+            )
+        return new_request
+
+
+def _expected_netloc(url):
+    parts = urllib.parse.urlsplit(url)
+    return parts.netloc
+
+
+def http_json_byte(url, timeout=60, max_bytes=None):
+    """Fetch raw bytes with same-host redirects and an optional size cap."""
+    limit = max_bytes if max_bytes is not None else 1024 * 1024 * 1024
+    expected = _expected_netloc(url)
+    opener = urllib.request.build_opener(SameHostRedirectHandler(expected))
+    try:
+        with opener.open(url, timeout=timeout) as response:
+            chunks = []
+            total = 0
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > limit:
+                    raise RuntimeError(
+                        f"download exceeds {limit} byte cap from {url}"
+                    )
+                chunks.append(chunk)
+            return b"".join(chunks)
+    except urllib.error.HTTPError as error:
+        body = error.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"HTTP {error.code}: {url} {body}".strip())
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        raise RuntimeError(f"download failed {url}: {error}")
+
+
+def _safe_local_source_path(source_path, allowed_roots):
+    """Resolve a server-reported local path only when it stays inside allowed roots."""
+    candidate = Path(source_path).expanduser().resolve()
+    if not allowed_roots:
+        raise RuntimeError(
+            "mzsj local source path rejected: no allowed local output roots configured"
+        )
+    for root in allowed_roots:
+        root_path = Path(root).expanduser().resolve()
+        if candidate.is_relative_to(root_path):
+            return candidate
+    raise RuntimeError(
+        f"mzsj local source path rejected (outside allowed roots): {source_path}"
+    )
+
+
+def _sanitize_remote_name(name):
+    """Keep printable multipart filename content, strip header-injection characters."""
+    cleaned = []
+    for char in str(name):
+        if char in ('"', "\\", "/", "\r", "\n", ":", "*", "?", "<", ">", "|"):
+            cleaned.append("_")
+        elif ord(char) < 32 or ord(char) == 127:
+            continue
+        else:
+            cleaned.append(char)
+    result = "".join(cleaned).strip(" .")
+    result = result.replace("..", ".")
+    return result or "upload"
 
 
 def derive_provider_task_id(entry):
@@ -391,7 +484,15 @@ def semantic_binding_sets(manifest, values):
     return specs
 
 
-def download_artifacts(project, run_id, instance, server, target_dir=None, overwrite=False):
+def download_artifacts(
+    project,
+    run_id,
+    instance,
+    server,
+    target_dir=None,
+    overwrite=False,
+    allowed_source_roots=None,
+):
     """Download artifacts for a completed run into the project; never moves originals."""
     run_dir = read_run_dir(project, run_id)
     meta = read_run_meta(run_dir)
@@ -405,6 +506,11 @@ def download_artifacts(project, run_id, instance, server, target_dir=None, overw
             "error": "run has no structured artifacts to download",
         }
     target = Path(target_dir or (Path(project).expanduser() / "artifacts")).expanduser()
+    allowed_roots = allowed_source_roots or []
+    if instance and isinstance(instance, dict):
+        output_dir = instance.get("output_dir")
+        if output_dir:
+            allowed_roots = [*allowed_roots, output_dir]
     downloaded = []
     failures = []
     for artifact in artifacts:
@@ -426,12 +532,13 @@ def download_artifacts(project, run_id, instance, server, target_dir=None, overw
             continue
         try:
             if source_path and artifact.get("type") == "mzsj":
-                if not Path(source_path).exists():
-                    raise RuntimeError(f"mzsj source file not found: {source_path}")
-                data = Path(source_path).read_bytes()
+                resolved = _safe_local_source_path(source_path, allowed_roots)
+                if not resolved.exists():
+                    raise RuntimeError(f"mzsj source file not found: {resolved}")
+                data = resolved.read_bytes()
                 source_record = {
                     "kind": "local",
-                    "source_path": str(Path(source_path).resolve()),
+                    "source_path": str(resolved),
                 }
             else:
                 if not view_url:
@@ -483,15 +590,7 @@ def download_artifacts(project, run_id, instance, server, target_dir=None, overw
     return result
 
 
-def http_json_byte(url, timeout=60):
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
-            return response.read()
-    except (urllib.error.URLError, TimeoutError, OSError) as error:
-        raise RuntimeError(f"download failed {url}: {error}")
-
-
-def upload_image(server, local_path, remote_name=None, overwrite=False):
+def upload_image(server, local_path, remote_name=None):
     """Upload one local image to ComfyUI /upload/image; returns server filename."""
     path = Path(local_path).expanduser()
     if not path.is_file():
@@ -499,9 +598,9 @@ def upload_image(server, local_path, remote_name=None, overwrite=False):
     content = path.read_bytes()
     if not content:
         raise ValueError(f"image file is empty: {path}")
-    remote_name = remote_name or path.name
+    remote_name = _sanitize_remote_name(remote_name or path.name)
     boundary = "----ai-video-studio" + hashlib.sha256(content).hexdigest()[:12]
-    filename_field = urllib.parse.quote(remote_name)
+    filename_field = remote_name
     body = bytearray()
     body.extend(f"--{boundary}\r\n".encode())
     body.extend(
@@ -522,7 +621,7 @@ def upload_image(server, local_path, remote_name=None, overwrite=False):
     except urllib.error.HTTPError as error:
         raise RuntimeError(f"upload failed HTTP {error.code}: {error.read().decode('utf-8', 'replace')[:500]}")
     except (urllib.error.URLError, TimeoutError, OSError) as error:
-        raise RuntimeError(f"upload failed {url}: {error}")
+        raise RuntimeError(f"upload failed {server}/upload/image: {error}")
     try:
         payload = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError:

@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import tempfile
+import urllib.request
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -324,6 +325,126 @@ class UploadAndDownloadTests(unittest.TestCase):
         )
         self.assertIn('137.inputs.image="ref.png"', specs)
         self.assertIn('138.inputs.value="一只猫"', specs)
+
+    def test_mzsj_source_path_outside_allowed_roots_is_rejected(self):
+        root = Path(self.tmp.name)
+        project = root / "project"
+        run_dir = project / "runs" / "r1"
+        run_dir.mkdir(parents=True)
+        secret = root / "secret.txt"
+        secret.write_text("secret", encoding="utf-8")
+        meta = {
+            "status": "completed",
+            "prompt_id": "p-1",
+            "artifacts": [
+                {
+                    "node": "7",
+                    "kind": "video",
+                    "filename": "leak.mp4",
+                    "type": "mzsj",
+                    "source_path": str(secret),
+                    "view_url": None,
+                }
+            ],
+        }
+        (run_dir / "run.json").write_text(json.dumps(meta), encoding="utf-8")
+        result = bridge.tool_download_artifacts(
+            "r1", str(project), instance_id="local-a", catalog_path=self.catalog
+        )
+        self.assertFalse(result["ok"])
+        self.assertEqual(len(result["downloaded"]), 0)
+        self.assertEqual(len(result["failures"]), 1)
+        self.assertIn("rejected", result["failures"][0]["error"])
+
+    def test_mzsj_source_path_inside_allowed_root_is_read(self):
+        root = Path(self.tmp.name)
+        project = root / "project"
+        run_dir = project / "runs" / "r1"
+        run_dir.mkdir(parents=True)
+        output_root = root / "comfy-output"
+        output_root.mkdir(parents=True)
+        video = output_root / "mzsj_task.mp4"
+        video.write_bytes(b"video-bytes")
+        meta = {
+            "status": "completed",
+            "prompt_id": "p-1",
+            "artifacts": [
+                {
+                    "node": "7",
+                    "kind": "video",
+                    "filename": "mzsj_task.mp4",
+                    "type": "mzsj",
+                    "source_path": str(video),
+                    "view_url": None,
+                }
+            ],
+        }
+        (run_dir / "run.json").write_text(json.dumps(meta), encoding="utf-8")
+        instance = {
+            "instance_id": "local-a",
+            "server": "http://127.0.0.1:8188",
+            "output_dir": str(output_root),
+        }
+        result = bridge.run_mgmt_mod.download_artifacts(
+            str(project), "r1", instance, "http://127.0.0.1:8188"
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["downloaded"][0]["filename"], "mzsj_task.mp4")
+
+    def test_same_host_redirect_handler_blocks_other_host(self):
+        handler = bridge.run_mgmt_mod.SameHostRedirectHandler("comfy.example")
+        request = urllib.request.Request("http://comfy.example/view?x=1")
+        with self.assertRaises(RuntimeError):
+            handler.redirect_request(
+                request,
+                mock.MagicMock(),
+                302,
+                "Found",
+                {"Location": "http://evil.example/x"},
+                "http://evil.example/x",
+            )
+
+    def test_same_host_redirect_handler_allows_same_host(self):
+        handler = bridge.run_mgmt_mod.SameHostRedirectHandler("comfy.example")
+        request = urllib.request.Request("http://comfy.example/view?x=1")
+        new_request = handler.redirect_request(
+            request,
+            mock.MagicMock(),
+            302,
+            "Found",
+            {"Location": "http://comfy.example/other"},
+            "http://comfy.example/other",
+        )
+        self.assertIsNotNone(new_request)
+        self.assertEqual(new_request.full_url, "http://comfy.example/other")
+
+    def test_sanitize_remote_name_strips_injection_chars(self):
+        name = bridge.run_mgmt_mod._sanitize_remote_name('a"b\r\nc/../d')
+        self.assertNotIn('"', name)
+        self.assertNotIn("\r", name)
+        self.assertNotIn("\n", name)
+        self.assertNotIn("/", name)
+        self.assertNotIn("..", name)
+
+    def test_run_name_traversal_rejected(self):
+        with mock.patch.object(
+            bridge.run_mgmt_mod, "http_json", return_value={"prompt_id": "p-1"}
+        ):
+            with self.assertRaises(ValueError):
+                bridge.tool_submit_workflow(
+                    "video",
+                    str(self.registry),
+                    instance_id="local-a",
+                    catalog_path=self.catalog,
+                    project=self.project,
+                    run_name="../../escape",
+                )
+
+    def test_read_run_dir_rejects_escape(self):
+        project = Path(self.tmp.name) / "project"
+        project.mkdir()
+        with self.assertRaises(LookupError):
+            bridge.run_mgmt_mod.read_run_dir(str(project), "../../etc")
 
     def test_provider_task_id_derived_from_ui(self):
         entry = {

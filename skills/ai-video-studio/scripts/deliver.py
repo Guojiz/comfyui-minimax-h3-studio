@@ -88,8 +88,11 @@ def load_manifest(path):
     raise UsageError("交付清单必须是 JSON 对象（含 files 列表）或条目列表")
 
 
-def parse_entries(files, manifest_path):
+def parse_entries(files, manifest_path, project_root=None):
     base = Path(manifest_path).expanduser().resolve().parent
+    if project_root is None:
+        project_root = base
+    root = Path(project_root).expanduser().resolve()
     entries = []
     for index, item in enumerate(files, start=1):
         if not isinstance(item, dict):
@@ -100,10 +103,21 @@ def parse_entries(files, manifest_path):
             raise UsageError(f"清单第 {index} 项缺少 path 字符串")
         if not isinstance(role, str) or not role.strip():
             raise UsageError(f"清单第 {index} 项（{raw_path}）缺少 role 字符串")
-        source = Path(raw_path).expanduser()
+        if raw_path.startswith("~"):
+            raise UsageError(f"清单第 {index} 项 path 不允许使用 ~ 展开: {raw_path}")
+        source = Path(raw_path)
+        if source.is_absolute():
+            raise UsageError(f"清单第 {index} 项 path 必须是项目内相对路径: {raw_path}")
+        if any(part in ("..", ".") or not part for part in source.parts):
+            raise UsageError(f"清单第 {index} 项 path 含非法路径段: {raw_path}")
         if not source.is_absolute():
             source = base / source
-        entries.append({"index": index, "role": role.strip(), "source": source, "raw": item})
+        resolved = source.resolve()
+        if not resolved.is_relative_to(root):
+            raise UsageError(
+                f"清单第 {index} 项 path 越出项目根目录: {raw_path}（根: {root}）"
+            )
+        entries.append({"index": index, "role": role.strip(), "source": resolved, "raw": item})
     return entries
 
 
@@ -177,7 +191,7 @@ def now_iso():
 def run(args):
     manifest_path = Path(args.manifest).expanduser()
     files, meta = load_manifest(manifest_path)
-    entries = parse_entries(files, manifest_path)
+    entries = parse_entries(files, manifest_path, project_root=args.project)
     if not entries:
         raise UsageError("清单中没有任何文件")
     validate_sources(entries)

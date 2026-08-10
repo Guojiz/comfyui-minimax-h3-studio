@@ -196,13 +196,27 @@ def emit_final(args, result):
             print(line)
 
 
+def normalize_server_url(value):
+    if not isinstance(value, str) or not value.strip():
+        raise UsageError("ComfyUI server URL must not be empty")
+    parts = urllib.parse.urlsplit(value.strip())
+    if parts.scheme.lower() not in ("http", "https"):
+        raise UsageError("ComfyUI server URL must use http/https")
+    if not parts.netloc:
+        raise UsageError("ComfyUI server URL is missing a host")
+    if parts.username or parts.password:
+        raise UsageError("ComfyUI server URL must not embed credentials")
+    path = parts.path.rstrip("/")
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, "", ""))
+
+
 def resolve_server(args):
     """Explicit server wins; env COMFY_SERVER is explicit configuration, never a silent default."""
     if args.server:
-        return args.server.strip().rstrip("/")
+        return normalize_server_url(args.server)
     env_server = os.environ.get("COMFY_SERVER")
     if env_server:
-        return env_server.strip().rstrip("/")
+        return normalize_server_url(env_server)
     return None
 
 

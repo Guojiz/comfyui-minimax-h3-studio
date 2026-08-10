@@ -10,11 +10,23 @@ import io
 import time
 import urllib.request
 import urllib.error
+import re
+import urllib.parse
 
 import folder_paths
 
 NODE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(NODE_DIR, "config.json")
+PREFIX_RE = re.compile(r"^[A-Za-z0-9._/-]{1,128}$")
+
+
+def _safe_prefix(prefix):
+    if not isinstance(prefix, str) or not PREFIX_RE.fullmatch(prefix):
+        raise RuntimeError("filename_prefix 只能包含字母、数字、点、下划线、横线和 /")
+    parts = prefix.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        raise RuntimeError("filename_prefix 不能包含空段、. 或 ..")
+    return prefix
 
 
 def _load_config():
@@ -51,6 +63,7 @@ class HuoshenImageGenerate:
         api_key = cfg.get("api_key", "")
         base_url = cfg.get("base_url", "https://huoshenai.net").rstrip("/")
         model = cfg.get("model", "gpt-image-2")
+        prefix = _safe_prefix(filename_prefix)
         if not api_key:
             raise RuntimeError("缺少 huoshen API Key，请编辑 comfyui-huoshen-image/config.json")
 
@@ -81,7 +94,17 @@ class HuoshenImageGenerate:
         if item.get("b64_json"):
             img_bytes = base64.b64decode(item["b64_json"])
         elif item.get("url"):
-            with urllib.request.urlopen(item["url"], timeout=120) as r:
+            image_url = item["url"]
+            allowed_hosts = {urllib.parse.urlsplit(base_url).netloc}
+            for extra in (cfg.get("allowed_image_hosts") or []):
+                allowed_hosts.add(str(extra).strip())
+            image_host = urllib.parse.urlsplit(image_url).netloc
+            if image_host not in allowed_hosts:
+                raise RuntimeError(
+                    f"拒绝下载非白名单主机 {image_host} 的图片；"
+                    "请在 config.json 的 allowed_image_hosts 中显式声明"
+                )
+            with urllib.request.urlopen(image_url, timeout=120) as r:
                 img_bytes = r.read()
         else:
             raise RuntimeError(f"响应中无图片数据: {json.dumps(item, ensure_ascii=False)[:300]}")
@@ -96,10 +119,13 @@ class HuoshenImageGenerate:
 
         # 保存到 output 目录，便于在输出面板查看
         out_dir = folder_paths.get_output_directory()
-        filename = f"{filename_prefix}_{int(time.time())}.png"
-        img.save(os.path.join(out_dir, filename))
-        print(f"[HuoshenImage] 已保存: {os.path.join(out_dir, filename)}")
-        return (tensor, os.path.join(out_dir, filename))
+        filename = f"{prefix}_{int(time.time())}.png"
+        full_path = os.path.normpath(os.path.join(out_dir, filename))
+        if not full_path.startswith(os.path.normpath(out_dir) + os.sep):
+            raise RuntimeError("输出路径越出了 ComfyUI output 目录")
+        img.save(full_path)
+        print(f"[HuoshenImage] 已保存: {full_path}")
+        return (tensor, full_path)
 
 
 NODE_CLASS_MAPPINGS = {

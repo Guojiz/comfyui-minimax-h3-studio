@@ -10,6 +10,7 @@ import base64
 import io
 import urllib.request
 import urllib.error
+import re
 
 import folder_paths
 
@@ -54,6 +55,34 @@ def _image_to_data_url(image_tensor):
 
 SUCCESS_STATUSES = {"succeeded", "success", "completed", "finished", "done"}
 FAIL_STATUSES = {"failed", "error", "cancelled", "canceled", "timeout"}
+TASK_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _validate_task_id(task_id):
+    if not isinstance(task_id, str) or not TASK_ID_RE.fullmatch(task_id):
+        raise RuntimeError(f"provider 返回的任务 ID 不合法: {task_id!r}")
+    return task_id
+
+
+def _allowed_download_hosts(cfg, base_url):
+    hosts = {urllib.parse.urlsplit(base_url).netloc}
+    for extra in (cfg.get("allowed_download_hosts") or []):
+        hosts.add(str(extra).strip())
+    return {host for host in hosts if host}
+
+
+def _download_video(video_url, headers, out_path, max_bytes):
+    req = urllib.request.Request(video_url, headers=headers)
+    with urllib.request.urlopen(req, timeout=300) as resp, open(out_path, "wb") as f:
+        total = 0
+        while True:
+            chunk = resp.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise RuntimeError(f"视频下载超过大小上限（{max_bytes} 字节）")
+            f.write(chunk)
 
 
 def _unwrap_task(res):
@@ -219,7 +248,7 @@ class MzsjVideoGenerate:
             )
         except urllib.error.HTTPError as e:
             raise RuntimeError(f"任务提交失败 HTTP {e.code}: {e.read().decode('utf-8', 'ignore')[:500]}")
-        task_id = task.get("id") or task.get("task_id")
+        task_id = _validate_task_id(task.get("id") or task.get("task_id"))
         if not task_id:
             raise RuntimeError(f"API 未返回任务 ID: {json.dumps(task, ensure_ascii=False)[:500]}")
         print(f"[MzsjVideo] 任务已提交: {task_id}")
@@ -237,7 +266,7 @@ class MzsjVideoGenerate:
             time.sleep(int(cfg.get("poll_interval_seconds", 8)))
             try:
                 task = _unwrap_task(_http_json(
-                    f"{base_url}{submit_path}/{task_id}",
+                    f"{base_url}{submit_path}/{urllib.parse.quote(task_id, safe='')}",
                     headers=headers, timeout=60,
                 ))
             except urllib.error.HTTPError as e:
@@ -271,9 +300,18 @@ class MzsjVideoGenerate:
         os.makedirs(out_dir, exist_ok=True)
         filename = f"mzsj_{task_id}.mp4"
         full_path = os.path.join(out_dir, filename)
-        req = urllib.request.Request(video_url, headers=headers)
-        with urllib.request.urlopen(req, timeout=300) as resp, open(full_path, "wb") as f:
-            f.write(resp.read())
+        allowed_hosts = _allowed_download_hosts(cfg, base_url)
+        download_host = urllib.parse.urlsplit(video_url).netloc
+        if download_host not in allowed_hosts:
+            raise RuntimeError(
+                f"拒绝下载非白名单主机 {download_host} 的视频；"
+                "请在 config.json 的 allowed_download_hosts 中显式声明"
+            )
+        download_headers = (
+            headers if download_host == urllib.parse.urlsplit(base_url).netloc else {}
+        )
+        max_bytes = int(cfg.get("max_download_bytes", 4 * 1024 * 1024 * 1024))
+        _download_video(video_url, download_headers, full_path, max_bytes)
         print(f"[MzsjVideo] 已保存: {full_path}")
         return {
             "ui": {"video_paths": [full_path], "video_filenames": [filename]},

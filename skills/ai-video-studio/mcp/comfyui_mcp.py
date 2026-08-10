@@ -30,6 +30,7 @@ HEALTH_TIMEOUT = 8
 SUBPROCESS_TIMEOUT_GRACE = 30
 MAX_OUTPUT_CHARS = 250_000
 WORKFLOW_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SERVER_ENV = "COMFY_SERVER"
 REGISTRY_ENV = "COMFY_WORKFLOW_REGISTRY"
 
@@ -98,6 +99,22 @@ def normalize_registry_dir(value):
     if not path.is_dir():
         raise ValueError(f"workflow registry is not a directory: {path}")
     return str(path.resolve())
+
+
+def validate_run_label(value, option):
+    """Reject separators and traversal in run/shot/iteration labels."""
+    if value is None:
+        return None
+    value = str(value).strip()
+    if not value or value in (".", ".."):
+        raise ValueError(f"{option} must not be empty, '.' or '..'")
+    if "/" in value or "\\" in value:
+        raise ValueError(f"{option} must not contain path separators")
+    if not LABEL_RE.fullmatch(value):
+        raise ValueError(
+            f"{option} contains unsafe characters; use alphanumerics plus . _ -"
+        )
+    return value
 
 
 def load_registry(registry_dir=None):
@@ -494,6 +511,10 @@ def tool_submit_workflow(
     if not isinstance(workflow, dict):
         raise ValueError(f"workflow {workflow_id} must be a JSON object")
 
+    safe_run_name = validate_run_label(run_name, "run_name")
+    shot = validate_run_label(shot, "shot")
+    iteration = validate_run_label(iteration, "iteration")
+
     record, source = instances_mod.resolve_instance(
         instance_id, server, project, catalog_path
     )
@@ -501,7 +522,7 @@ def tool_submit_workflow(
     key = run_mgmt_mod.idempotency_key(
         record["instance_id"], workflow, sets, seed, intended_run or "default"
     )
-    run_id = run_name or f"run-{key}-{uuid.uuid4().hex[:6]}"
+    run_id = safe_run_name or f"run-{key}-{uuid.uuid4().hex[:6]}"
     run_dir = _Path(project).expanduser() / "runs" / run_id
     if run_dir.exists():
         existing = run_mgmt_mod.read_run_meta(run_dir)
@@ -710,7 +731,6 @@ def tool_upload_asset(
     instance_id=None,
     catalog_path=None,
     remote_name=None,
-    overwrite=False,
     authorized=False,
     workflow_id=None,
     registry_dir=None,
@@ -723,7 +743,7 @@ def tool_upload_asset(
         )
     record, _ = instances_mod.resolve_instance(instance_id, server, None, catalog_path)
     result = run_mgmt_mod.upload_image(
-        record["server"], local_path, remote_name, overwrite
+        record["server"], local_path, remote_name
     )
     if workflow_id and semantic_input:
         workflow_path = resolve_workflow(workflow_id, registry_dir)
@@ -925,7 +945,6 @@ def create_server(server=None, registry_dir=None, catalog_path=None):
         local_path: str,
         instance_id: str | None = None,
         remote_name: str | None = None,
-        overwrite: bool = False,
         authorized: bool = False,
         workflow_id: str | None = None,
         semantic_input: str | None = None,
@@ -937,7 +956,6 @@ def create_server(server=None, registry_dir=None, catalog_path=None):
                 instance_id,
                 catalog_path,
                 remote_name,
-                overwrite,
                 authorized,
                 workflow_id,
                 registry,

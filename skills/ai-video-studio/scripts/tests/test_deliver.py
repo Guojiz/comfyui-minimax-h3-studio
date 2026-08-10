@@ -265,6 +265,38 @@ class DeliveryTests(unittest.TestCase):
             payload = json.loads(stdout.getvalue())
             self.assertIn("无法读取交付清单", payload["error"])
 
+    def test_absolute_path_in_manifest_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, media, files = make_project(tmp)
+            manifest = write_manifest(
+                root, [{"path": str(files["a.mp4"]), "role": "video"}]
+            )
+            with redirect_stdout(io.StringIO()):
+                code = deliver.main([str(manifest), "--project", str(root), "--json"])
+            self.assertEqual(code, 1)
+
+    def test_tilde_and_traversal_paths_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, media, _ = make_project(tmp)
+            for bad in ("~/secret.txt", "media/../../outside.mp4"):
+                manifest = write_manifest(
+                    root, [{"path": bad, "role": "video"}]
+                )
+                with redirect_stdout(io.StringIO()):
+                    code = deliver.main([str(manifest), "--project", str(root), "--json"])
+                self.assertEqual(code, 1, bad)
+
+    def test_path_escaping_project_root_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside = Path(tmp).parent / "outside" / "secret.mp4"
+            outside.parent.mkdir(exist_ok=True)
+            outside.write_bytes(b"zzz")
+            manifest = write_manifest(root, [{"path": "../outside/secret.mp4", "role": "video"}])
+            with redirect_stdout(io.StringIO()):
+                code = deliver.main([str(manifest), "--project", str(root), "--json"])
+            self.assertEqual(code, 1)
+
 
 if __name__ == "__main__":
     unittest.main()
