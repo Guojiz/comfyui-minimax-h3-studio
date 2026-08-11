@@ -21,13 +21,14 @@
 
 ## 工具与依赖
 
-Phase 4 提供三个确定性脚本（位于 `scripts/`，均为新增文件，未改动任何既有脚本）：
+Phase 4 提供确定性脚本（位于 `scripts/`）：
 
 | 脚本 | 用途 | 退出码 |
 | --- | --- | --- |
 | `scripts/media-probe.py` | 定位 ffprobe/ffmpeg 并探测时长、宽高、帧率、音轨数 | 0 成功；1 用法；2 缺依赖；3 文件缺失/不可读 |
 | `scripts/rough-cut.py` | 统一目标规格后规范化并拼接 | 0 成功；1 用法/规格不一致；2 缺依赖；3 输入缺失/不可读；4 ffmpeg 失败 |
 | `scripts/deliver.py` | approved-only 交付，生成 delivery.json | 0 成功；1 清单/用法；3 清单文件缺失/不可读/为空；4 写入/校验失败 |
+| `scripts/remotion-render.py` | 渲染 Remotion 动效/可视化片段（版本化输出） | 0 成功；1 用法；2 缺 node/Remotion 依赖；3 入口/项目路径错误；4 渲染失败 |
 
 工具定位顺序（两个脚本一致）：`--ffmpeg-dir` → `FFMPEG_DIR` 环境变量 → `PATH` → 常见安装目录。
 找不到时返回退出码 2，错误信息包含修复指引（例如 `brew install ffmpeg`，或设置 `FFMPEG_DIR`
@@ -39,6 +40,7 @@ Phase 4 提供三个确定性脚本（位于 `scripts/`，均为新增文件，�
 python3 scripts/media-probe.py shot-01.mp4 shot-02.mp4 --json
 python3 scripts/rough-cut.py shot-01.mp4 shot-02.mp4 --project <项目> --json --dry-run
 python3 scripts/deliver.py <项目>/delivery-manifest.json --project <项目> --json
+python3 scripts/remotion-render.py --entry <项目>/remotion-src/src/Index.tsx --project <项目> --json
 ```
 
 ## 流程总览
@@ -46,6 +48,7 @@ python3 scripts/deliver.py <项目>/delivery-manifest.json --project <项目> --
 ```text
 edit plan / EDL
 → 抽帧与技术 QC（media-probe + 静帧检查）
+→ 动效/可视化合成（Remotion，按需：标题、文字动画、图表、HUD）
 → 粗剪（rough-cut，先 dry-run 看计划）
 → 规范化（统一 width/height/fps、编码与音频参数）
 → 字幕 / 音频 / 转场（按需）
@@ -108,6 +111,8 @@ ffmpeg -ss 00:00:01 -i shot-01.mp4 -frames:v 1 -q:v 2 frame-01.png
 - 音频：对白/BGM/环境音分轨、响度统一（例如 EBU R128 `loudnorm` 目标）属于确定性混音；
   不要在混音阶段重新调用生成模型。
 - 转场：简单转场（淡入淡出、交叉溶解等）用 FFmpeg `xfade` 或剪辑工具；复杂镜头关系回到生成阶段补镜头。
+- 动效与可视化：文字动画、图表、HUD、片头片尾等程序化画面用 Remotion 渲染成独立片段，
+  再作为一段输入进入粗剪（详见 `references/remotion.md`）；不要用生成模型去“碰运气”出精确图形。
 
 以上命令属于标准工具用法，当前机器未做真实执行验证（见“验证状态”）；正式使用前先在样片上验证。
 

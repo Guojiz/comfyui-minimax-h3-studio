@@ -160,6 +160,10 @@ FFmpeg 后期与 approved-only 交付按 `references/post-production.md` 执行�
 粗剪自动版本化，交付只处理 approved 清单并生成 `delivery.json`。当前长视频为
 `long-video: design documented, execution unverified`，不得冒充已验证能力。
 
+需要程序化动效、文字动画、图表/数据可视化或片头片尾时，用 `scripts/remotion-render.py`
+渲染 Remotion 片段并作为普通素材进入粗剪；Remotion 不替代长视频粗剪。脚本不自动安装
+依赖，许可合规由客户确认，详见 `references/remotion.md`。
+
 ### 剪辑是 Agent 指导的工作
 
 长视频的真正难点是剪辑决定，不是单段生成。工具只执行，不替 Agent 决定：
@@ -176,6 +180,7 @@ FFmpeg 后期与 approved-only 交付按 `references/post-production.md` 执行�
 按需读取 `references/quality-control.md`、`references/rework.md` 和 `references/long-video.md`。
 创作质量门见 `references/creative-gates.md`；确定性后期与交付见 `references/post-production.md`。
 决定“这次在哪里生成、是否用外部服务”时读取 `references/connection-modes.md`。
+Remotion 动效/可视化合成见 `references/remotion.md`。
 
 ## Skill 演进
 
@@ -197,6 +202,7 @@ FFmpeg 后期与 approved-only 交付按 `references/post-production.md` 执行�
 | `references/creative-gates.md` | 正式提交前的参考图、节奏/时长、提示词检查 |
 | `references/post-production.md` | 抽帧 QC、粗剪、规范化、字幕/音频/交付 |
 | `references/connection-modes.md` | 选择远端/本机 ComfyUI 实例，或接入外部 API Key 服务 |
+| `references/remotion.md` | 用 Remotion 做动效、可视化、标题与片头片尾 |
 | `references/skill-evolution.md` | 从实践生成或更新 Skill |
 | `references/codex.md` | Codex 宿主的工具映射 |
 | `references/qoder.md` | Qoder 兼容安装与路径 |
