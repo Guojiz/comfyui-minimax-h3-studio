@@ -326,7 +326,7 @@ class UploadAndDownloadTests(unittest.TestCase):
         self.assertIn('137.inputs.image="ref.png"', specs)
         self.assertIn('138.inputs.value="一只猫"', specs)
 
-    def test_mzsj_source_path_outside_allowed_roots_is_rejected(self):
+    def test_local_video_source_path_outside_allowed_roots_is_rejected(self):
         root = Path(self.tmp.name)
         project = root / "project"
         run_dir = project / "runs" / "r1"
@@ -341,7 +341,7 @@ class UploadAndDownloadTests(unittest.TestCase):
                     "node": "7",
                     "kind": "video",
                     "filename": "leak.mp4",
-                    "type": "mzsj",
+                    "type": "local-video",
                     "source_path": str(secret),
                     "view_url": None,
                 }
@@ -356,14 +356,14 @@ class UploadAndDownloadTests(unittest.TestCase):
         self.assertEqual(len(result["failures"]), 1)
         self.assertIn("rejected", result["failures"][0]["error"])
 
-    def test_mzsj_source_path_inside_allowed_root_is_read(self):
+    def test_local_video_source_path_inside_allowed_root_is_read(self):
         root = Path(self.tmp.name)
         project = root / "project"
         run_dir = project / "runs" / "r1"
         run_dir.mkdir(parents=True)
         output_root = root / "comfy-output"
         output_root.mkdir(parents=True)
-        video = output_root / "mzsj_task.mp4"
+        video = output_root / "generated_task.mp4"
         video.write_bytes(b"video-bytes")
         meta = {
             "status": "completed",
@@ -372,8 +372,8 @@ class UploadAndDownloadTests(unittest.TestCase):
                 {
                     "node": "7",
                     "kind": "video",
-                    "filename": "mzsj_task.mp4",
-                    "type": "mzsj",
+                    "filename": "generated_task.mp4",
+                    "type": "local-video",
                     "source_path": str(video),
                     "view_url": None,
                 }
@@ -389,7 +389,41 @@ class UploadAndDownloadTests(unittest.TestCase):
             str(project), "r1", instance, "http://127.0.0.1:8188"
         )
         self.assertTrue(result["ok"])
-        self.assertEqual(result["downloaded"][0]["filename"], "mzsj_task.mp4")
+        self.assertEqual(result["downloaded"][0]["filename"], "generated_task.mp4")
+
+    def test_legacy_local_artifact_type_is_still_accepted(self):
+        root = Path(self.tmp.name)
+        project = root / "project"
+        run_dir = project / "runs" / "r1"
+        run_dir.mkdir(parents=True)
+        output_root = root / "comfy-output"
+        output_root.mkdir(parents=True)
+        video = output_root / "old.mp4"
+        video.write_bytes(b"old-video")
+        meta = {
+            "status": "completed",
+            "prompt_id": "p-1",
+            "artifacts": [
+                {
+                    "node": "7",
+                    "kind": "video",
+                    "filename": "old.mp4",
+                    "type": "local-video",
+                    "source_path": str(video),
+                    "view_url": None,
+                }
+            ],
+        }
+        (run_dir / "run.json").write_text(json.dumps(meta), encoding="utf-8")
+        instance = {
+            "instance_id": "local-a",
+            "server": "http://127.0.0.1:8188",
+            "output_dir": str(output_root),
+        }
+        result = bridge.run_mgmt_mod.download_artifacts(
+            str(project), "r1", instance, "http://127.0.0.1:8188"
+        )
+        self.assertTrue(result["ok"])
 
     def test_same_host_redirect_handler_blocks_other_host(self):
         handler = bridge.run_mgmt_mod.SameHostRedirectHandler("comfy.example")
@@ -446,21 +480,21 @@ class UploadAndDownloadTests(unittest.TestCase):
         with self.assertRaises(LookupError):
             bridge.run_mgmt_mod.read_run_dir(str(project), "../../etc")
 
-    def test_provider_task_id_derived_from_ui(self):
+    def test_external_task_id_derived_from_ui(self):
         entry = {
             "outputs": {
                 "7": {
                     "ui": {
-                        "task_ids": ["mzsj-task-42"],
-                        "video_paths": ["/output/mzsj/x.mp4"],
+                        "task_ids": ["task-42"],
+                        "video_paths": ["/output/local/x.mp4"],
                     }
                 }
             }
         }
-        task_id = bridge.run_mgmt_mod.derive_provider_task_id(entry)
-        self.assertEqual(task_id, "mzsj-task-42")
+        task_id = bridge.run_mgmt_mod.derive_external_task_id(entry)
+        self.assertEqual(task_id, "task-42")
 
-    def test_completed_status_merges_mzsj_artifacts_into_run(self):
+    def test_completed_status_merges_local_video_artifacts_into_run(self):
         with mock.patch.object(
             bridge.run_mgmt_mod, "http_json", return_value={"prompt_id": "p-1"}
         ):
@@ -478,9 +512,9 @@ class UploadAndDownloadTests(unittest.TestCase):
                 "outputs": {
                     "7": {
                         "ui": {
-                            "video_paths": ["/output/mzsj/x.mp4"],
+                            "video_paths": ["/output/local/x.mp4"],
                             "video_filenames": ["x.mp4"],
-                            "task_ids": ["mzsj-9"],
+                            "task_ids": ["task-9"],
                         }
                     }
                 },
@@ -498,8 +532,8 @@ class UploadAndDownloadTests(unittest.TestCase):
         meta = json.loads(
             (Path(self.project) / "runs" / "r5" / "run.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(meta["artifacts"][0]["type"], "mzsj")
-        self.assertEqual(meta["provider_task_id"], "mzsj-9")
+        self.assertEqual(meta["artifacts"][0]["type"], "local-video")
+        self.assertEqual(meta["external_task_id"], "task-9")
 
     def test_completed_status_merges_generic_images_with_view_url(self):
         with mock.patch.object(

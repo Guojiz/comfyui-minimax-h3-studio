@@ -15,18 +15,19 @@ ComfyUI 不决定创意流程，也不是唯一执行工具。Skill 规定怎么
 不要混淆：
 
 - **模型能力**：模型理论上能做什么；
-- **provider**：提交、轮询、下载和认证契约；
-- **profile**：当前实例的默认模型、尺寸、时长、限额和实测观察。
+- **实例部署配置**：当前 ComfyUI 实例的默认模型、尺寸、时长、限额和实测观察；
+- **外部服务契约**：只有用户明确选择某个服务后才描述其提交、轮询、下载和认证规则。
 
-正式模板的 manifest 必须引用 provider/profile。真实 key 留在本机 `config.json`，不写进 manifest、
-workflow、对话或 Git。当前打包示例见：
+正式模板的 manifest 必须引用实例部署配置。真实 key 留在本机 `config.json`，不写进 manifest、
+workflow、对话或 Git。
 
-- `assets/providers/mzsj-videos.json`
-- `assets/profiles/mzsj-current.example.json`
-- `assets/workflow_api_mzsj_video_text.manifest.json`
+**本 Skill 只绑定 ComfyUI，不内置、不默认任何模型或 API 服务。** 公开仓库不随包分发
+外部服务配置、服务自定义节点或第三方 workflow 模板；这些都属于用户本地研究库或项目配置。
+只要生成需要外部模型/API 服务（例如通过 ComfyUI 节点调用第三方 API、远程 GPU 平台），Agent
+必须先向客户确认：用哪个服务、是否已有本地配置、是否授权本次调用与可能的费用。没有明确选择
+与授权时，不得默认假设任何服务。素材上传到外部服务前同样需要显式授权。
 
-当前 `/v1/videos` provider 接受 HTTPS 图片 URL；本地 IMAGE/data URL 只属于明确配置的 legacy
-契约。公开临时图片前必须获得授权。当前 profile 的限制只在影响本次需求时告诉客户。
+公开临时图片前必须获得授权。当前实例配置的限制只在影响本次需求时告诉客户。
 
 ## Workflow 库
 
@@ -34,14 +35,14 @@ workflow、对话或 Git。当前打包示例见：
 
 ```json
 {
-  "id": "mzsj-video-text",
+  "id": "video-text",
   "purpose": "text to video",
-  "workflow": "workflow_api_mzsj_video_text.json",
-  "provider": "mzsj-videos",
-  "profile": "mzsj-current",
+  "workflow": "video-text.json",
+  "backend": "comfyui-local",
+  "profile": "local-default",
   "inputs": ["prompt", "seconds", "size"],
   "outputs": ["video"],
-  "required_nodes": ["DeepSeekPromptEnhance", "MzsjVideoGenerate"],
+  "required_nodes": ["TextEncode", "KSampler", "SaveVideo"],
   "verified": {"status": "live-tested", "date": "2026-08-08"},
   "source": "project",
   "license": "MIT"
@@ -119,8 +120,8 @@ UI 中未保存的状态成为唯一事实。
 | 现象 | 处理 |
 | --- | --- |
 | `object_info` 缺节点 | 换已安装 workflow 或补依赖；不要在付费窗口盲试 |
-| provider 字段错误 | 修 provider 适配，不改通用 Skill |
-| profile 限制不匹配 | 告诉客户实际影响，选择降规格、换 provider 或等待 |
+| 部署配置字段错误 | 修本地适配或换 workflow，不改通用 Skill |
+| 实例配置限制不匹配 | 告诉客户实际影响，选择降规格、换实例或等待 |
 | DNS 为 `198.18.x.x` 且超时 | 先恢复代理或路由，不重复提交 |
 | 同一策略连续失败 3 次 | 停止，换方法或请求客户决定 |
 | 找不到产物 | 以 history/run 记录为准，不用共享目录“最新文件”猜测 |
@@ -129,5 +130,5 @@ UI 中未保存的状态成为唯一事实。
 
 ## 复用纪律
 
-跑通后把项目 workflow、manifest、provider/profile 引用、验证证据和来源登记到 `assets.md`。只有
+跑通后把项目 workflow、manifest、部署配置引用、验证证据和来源登记到 `assets.md`。只有
 许可明确且达到所声明验证级别的模板才能晋升正式库。不要因为文件名写“已跑通”就声称本机验证。

@@ -1,4 +1,0 @@
-{
-  "deepseek": { "base_url": "https://api.deepseek.com", "api_key": "<YOUR_DEEPSEEK_KEY>", "model": "deepseek-v4-flash" },
-  "mzsj": { "base_url": "https://mzsjai.com", "api_key": "<YOUR_MZSJ_KEY>", "api_mode": "videos" }
-}

@@ -331,8 +331,8 @@ def extract_artifacts(outputs):
     return artifacts
 
 
-def extract_mzsj_artifacts(outputs):
-    """MZSJ nodes publish videos as ui.video_paths/video_filenames; turn them into artifacts."""
+def extract_local_video_artifacts(outputs):
+    """Nodes may publish videos as ui.video_paths/video_filenames; turn them into artifacts."""
     artifacts = []
     seen = set()
     for node_id, out in outputs.items():
@@ -358,7 +358,7 @@ def extract_mzsj_artifacts(outputs):
                     "kind": "video",
                     "filename": name,
                     "subfolder": "",
-                    "type": "mzsj",
+                    "type": "local-video",
                     "source_path": path,
                     "view_url": None,
                 }
@@ -569,9 +569,9 @@ def run(args):
         return 3
 
     outputs = outcome["entry"].get("outputs") if isinstance(outcome["entry"], dict) else {}
-    artifacts = extract_artifacts(outputs) + extract_mzsj_artifacts(outputs)
+    artifacts = extract_artifacts(outputs) + extract_local_video_artifacts(outputs)
     for artifact in artifacts:
-        if artifact["type"] != "mzsj" and artifact.get("view_url") is None:
+        if artifact["type"] != "local-video" and artifact.get("view_url") is None:
             query = urllib.parse.urlencode(
                 {
                     "filename": artifact["filename"],

@@ -56,7 +56,7 @@ ComfyUI 提供 workflow-as-code 操作面。不要为此再造 Agent Runtime、A
 
 1. 从正式库选择能力匹配且当前已配置的 workflow；客户也可以指定或替换。
 2. 将项目修改版复制到项目 `workflows/`，不要破坏公共模板。
-3. 按 provider/profile 解释实际字段和限制，不把当前实例配置冒充模型能力。
+3. 按实例/外部服务配置解释实际字段和限制，不把当前实例配置冒充模型能力。
 4. 先运行 `workflow-doctor.py` 和 `run-workflow.py --dry-run`。
 5. 高成本、公开上传或新授权在真实提交前确认；已清楚授权的低风险步骤不重复询问。
 6. 读取 history 和实际产物，登记客观 run 关系；不要用“共享目录最新文件”猜结果。
@@ -73,7 +73,7 @@ ComfyUI 提供 workflow-as-code 操作面。不要为此再造 Agent Runtime、A
 | 创意/方向 | 回到较低成本方向产物，不继续烧后续额度 |
 | prompt | 只修改 prompt 并生成新候选 |
 | 参考资产 | 替换对应资产，只重算依赖它的下游 |
-| workflow/provider | 修适配或换 workflow，保留创意和资产 |
+| workflow/外部服务适配 | 修本地适配或换 workflow，保留创意和资产 |
 | 后期 | 用确定性工具修字幕、响度、转场、容器 |
 
 一次只改变一个主要变量。保留旧候选，失败版本不能覆盖已批准资产。连续 3 次失败、预算耗尽、目标

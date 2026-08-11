@@ -73,10 +73,11 @@ Two safety rules are enforced by the runner and therefore by this bridge:
   `monitoring_timeout` are non-terminal; only backend-confirmed states become
   `completed`/`generation_failed`/`cancelled`.
 
-MZSJ-style nodes that publish `ui.video_paths`/`ui.video_filenames` are
-recognized and returned as `type: "mzsj"` artifacts with their source path.
-Provider task ids published as `ui.task_ids`/`ui.provider_task_ids` are written
-into the run record as soon as status is observed.
+Nodes that publish `ui.video_paths`/`ui.video_filenames` are recognized and
+returned as `type: "local-video"` artifacts with their source path. External
+task ids published as `ui.task_ids` are written into the run record as soon as
+status is observed. The bridge itself binds only to ComfyUI; no model or API
+service is assumed, bundled, or configured by default.
 
 ## Instance catalog
 
@@ -116,7 +117,7 @@ the exact `--set` spec to inject the uploaded server filename into the workflow.
 
 Every `*.json` file directly inside the registry directory is a workflow.
 Optional companion manifests are named `<workflow>.manifest.json` and provide
-metadata such as `id`, `purpose`, `provider`, `inputs`, `outputs`,
+metadata such as `id`, `purpose`, `inputs`, `outputs`,
 `required_nodes`, `verified`, `license`, `source`, and `distribution`. The
 manifest filename must match the workflow filename stem exactly (for example
 `minimax-h3-r2v-0.7mp.json` pairs with `minimax-h3-r2v-0.7mp.manifest.json`);

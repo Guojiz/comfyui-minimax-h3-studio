@@ -161,14 +161,14 @@ def _safe_local_source_path(source_path, allowed_roots):
     candidate = Path(source_path).expanduser().resolve()
     if not allowed_roots:
         raise RuntimeError(
-            "mzsj local source path rejected: no allowed local output roots configured"
+            "local video source path rejected: no allowed local output roots configured"
         )
     for root in allowed_roots:
         root_path = Path(root).expanduser().resolve()
         if candidate.is_relative_to(root_path):
             return candidate
     raise RuntimeError(
-        f"mzsj local source path rejected (outside allowed roots): {source_path}"
+        f"local video source path rejected (outside allowed roots): {source_path}"
     )
 
 
@@ -187,8 +187,8 @@ def _sanitize_remote_name(name):
     return result or "upload"
 
 
-def derive_provider_task_id(entry):
-    """MZSJ provider task ids live inside node internals, not ComfyUI history status."""
+def derive_external_task_id(entry):
+    """External task ids may live inside node ui payloads, not ComfyUI history status."""
     outputs = entry.get("outputs") if isinstance(entry, dict) else None
     if not isinstance(outputs, dict):
         return None
@@ -198,15 +198,18 @@ def derive_provider_task_id(entry):
         ui = out.get("ui")
         if not isinstance(ui, dict):
             continue
-        for key in ("task_ids", "provider_task_ids"):
+        for key in ("task_ids",):
             values = ui.get(key)
             if isinstance(values, list) and values:
                 return str(values[0])
     return None
 
 
-def extract_mzsj_artifacts(outputs):
-    """MZSJ nodes publish videos as ui.video_paths/video_filenames."""
+LOCAL_VIDEO_TYPES = ("local-video",)
+
+
+def extract_local_video_artifacts(outputs):
+    """Nodes may publish videos as ui.video_paths/video_filenames."""
     artifacts = []
     seen = set()
     for node_id, out in outputs.items():
@@ -232,7 +235,7 @@ def extract_mzsj_artifacts(outputs):
                     "kind": "video",
                     "filename": name,
                     "subfolder": "",
-                    "type": "mzsj",
+                    "type": "local-video",
                     "source_path": path,
                     "view_url": None,
                 }
@@ -281,10 +284,10 @@ def merge_artifacts_into_meta(meta, entry, server=None):
     outputs = entry.get("outputs") if isinstance(entry, dict) else None
     if not isinstance(outputs, dict):
         return meta
-    artifacts = extract_mzsj_artifacts(outputs) + extract_generic_artifacts(outputs)
+    artifacts = extract_local_video_artifacts(outputs) + extract_generic_artifacts(outputs)
     if server:
         for artifact in artifacts:
-            if artifact.get("view_url") is None and artifact.get("type") != "mzsj":
+            if artifact.get("view_url") is None and artifact.get("type") not in LOCAL_VIDEO_TYPES:
                 query = urllib.parse.urlencode(
                     {
                         "filename": artifact["filename"],
@@ -295,9 +298,9 @@ def merge_artifacts_into_meta(meta, entry, server=None):
                 artifact["view_url"] = server + "/view?" + query
     if artifacts:
         meta["artifacts"] = artifacts
-        provider_task_id = derive_provider_task_id(entry)
-        if provider_task_id:
-            meta["provider_task_id"] = provider_task_id
+        external_task_id = derive_external_task_id(entry)
+        if external_task_id:
+            meta["external_task_id"] = external_task_id
     return meta
 
 
@@ -531,10 +534,10 @@ def download_artifacts(
             )
             continue
         try:
-            if source_path and artifact.get("type") == "mzsj":
+            if source_path and artifact.get("type") in LOCAL_VIDEO_TYPES:
                 resolved = _safe_local_source_path(source_path, allowed_roots)
                 if not resolved.exists():
-                    raise RuntimeError(f"mzsj source file not found: {resolved}")
+                    raise RuntimeError(f"local video source file not found: {resolved}")
                 data = resolved.read_bytes()
                 source_record = {
                     "kind": "local",

@@ -23,7 +23,7 @@ skills/ai-video-studio/
   scripts/run-workflow.py  通用 API workflow 提交与客观 run 留痕
   scripts/workflow-doctor.py 运行前节点/资源体检
   mcp/                     Codex 到 ComfyUI HTTP API 的可选薄桥接器
-  assets/                   正式模板、provider/profile 和项目模板
+  assets/                   正式模板、部署配置和项目模板
 assets/comfyui-nodes/       ComfyUI 自定义节点
 examples/workflows/         第三方研究目录说明，不分发许可不明 JSON
 ```
@@ -58,11 +58,16 @@ Codex 可通过 `skills/ai-video-studio/mcp/comfyui_mcp.py` 把同一套 registr
 
 ## 配置与能力
 
-项目明确区分模型能力、provider API 契约和当前部署 profile。正式 workflow 配 manifest；真实 API Key
-只保存在本机 `config.json`，仓库仅发布示例。当前 MZSJ `/v1/videos` 适配支持 HTTPS 图片 URL；
+项目明确区分模型能力、实例部署和外部服务契约。正式 workflow 配 manifest；真实 API Key
+只保存在本机 `config.json`，仓库仅发布示例。
+
+**本 Skill 只绑定 ComfyUI，不内置、不默认任何模型或 API 服务。** 公开仓库不随包分发外部服务
+配置、服务自定义节点或第三方 workflow 模板。使用任何外部服务（API 节点、远程 GPU 平台、
+第三方 API）都必须由客户显式选择并授权：Agent 先问清用哪个服务、是否已有配置、是否接受费用，
+不得默认假设任何服务。
 legacy data URL 模式必须显式配置，不能混为同一契约。
 
-选择 workflow 时以当前 `object_info`、provider/profile、许可和验证状态为准。外部 JSON 只有在许可
+选择 workflow 时以当前 `object_info`、部署配置、许可和验证状态为准。外部 JSON 只有在许可
 明确、依赖清楚并达到声明验证级别后才能进入公开正式库。
 
 ## 验证范围

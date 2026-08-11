@@ -18,9 +18,9 @@ keys, auth headers, or credentials in the report.
   run names, shot/iteration labels, and delivery manifest paths are validated
   to prevent traversal; upload filenames are sanitized before entering
   multipart headers.
-- Provider responses in custom nodes are untrusted: task ids are validated,
-  download hosts are allowlisted, and the provider bearer key is only sent to
-  the configured provider host.
+- Responses from external services in custom nodes are untrusted: task ids are
+  validated, download hosts are allowlisted, and bearer keys are only sent to
+  the configured service host.
 
 ## Non-goals
 

@@ -25,7 +25,7 @@ skills/ai-video-studio/
   scripts/run-workflow.py    generic API workflow execution and factual run records
   scripts/workflow-doctor.py preflight node/resource checks
   mcp/                       optional thin Codex-to-ComfyUI HTTP bridge
-  assets/                     distributable templates, provider/profile, project template
+  assets/                     distributable templates, deployment config, project template
 assets/comfyui-nodes/         ComfyUI custom nodes
 examples/workflows/           research policy; no unlicensed third-party JSON redistribution
 ```
@@ -61,11 +61,15 @@ does not replace the agent, and live generation remains a write-approved tool ac
 
 ## Configuration and capability
 
-The project separates model capability, provider API contract, and deployment profile. A distributable workflow has a
-manifest. Real API keys stay in local `config.json`; only examples are published. The current MZSJ `/v1/videos` adapter
-accepts HTTPS image URLs. Legacy data-URL behavior must be selected explicitly and is a different contract.
+The project separates model capability, instance deployment, and external-service contract. A distributable workflow has a
+manifest. Real API keys stay in local `config.json`; only examples are published.
 
-Workflow selection depends on current `object_info`, provider/profile, license, and verification status. External JSON
+**The skill binds only to ComfyUI.** No model or API service is bundled, assumed, or configured by default. Any use
+of an external service (API-backed custom nodes, remote GPU platforms, third-party services) is a local, explicitly
+chosen configuration: the agent must ask the customer which service to use, confirm authorization and cost before
+generating, and never fall back to a default service.
+
+Workflow selection depends on current `object_info`, deployment configuration, license, and verification status. External JSON
 enters the public verified library only after its redistribution license, dependencies, and evidence are known.
 
 ## Verification scope

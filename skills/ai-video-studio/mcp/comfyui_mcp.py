@@ -169,7 +169,6 @@ def load_registry(registry_dir=None):
                 "manifest_file": str(manifest_path) if manifest_path.exists() else None,
                 "name": meta.get("name") or workflow_id,
                 "description": meta.get("purpose") or "",
-                "provider": meta.get("provider"),
                 "license": meta.get("license"),
                 "source": meta.get("source"),
                 "distribution": meta.get("distribution"),
@@ -651,9 +650,9 @@ def tool_get_run_status(
         }
     extra = {"prompt_id": prompt_id}
     if status["entry"] is not None:
-        provider_task_id = run_mgmt_mod.derive_provider_task_id(status["entry"])
-        if provider_task_id:
-            extra["provider_task_id"] = provider_task_id
+        external_task_id = run_mgmt_mod.derive_external_task_id(status["entry"])
+        if external_task_id:
+            extra["external_task_id"] = external_task_id
         if status["status"] == "completed":
             run_mgmt_mod.merge_artifacts_into_meta(meta, status["entry"], server_url)
             if meta.get("artifacts"):
@@ -676,9 +675,9 @@ def tool_get_run_status(
     }
     if status["entry"] is not None:
         result["entry"] = status["entry"]
-        provider_task_id = run_mgmt_mod.derive_provider_task_id(status["entry"])
-        if provider_task_id:
-            result["provider_task_id"] = provider_task_id
+        external_task_id = run_mgmt_mod.derive_external_task_id(status["entry"])
+        if external_task_id:
+            result["external_task_id"] = external_task_id
     return result
 
 

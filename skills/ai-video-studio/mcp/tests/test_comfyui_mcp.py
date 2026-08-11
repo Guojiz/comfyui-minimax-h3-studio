@@ -107,7 +107,6 @@ class RegistryTests(unittest.TestCase):
                 "purpose": "test workflow",
                 "inputs": ["prompt"],
                 "outputs": ["image"],
-                "provider": "local",
             },
         )
         listing = bridge.load_registry(str(self.registry))
@@ -118,7 +117,6 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(entry["node_count"], 1)
         self.assertEqual(entry["node_types"], ["CheckpointLoaderSimple"])
         self.assertEqual(entry["description"], "test workflow")
-        self.assertEqual(entry["provider"], "local")
         self.assertEqual(entry["inputs"], ["prompt"])
 
     def test_manifest_license_and_source_metadata(self):
@@ -252,7 +250,7 @@ class ToolTests(unittest.TestCase):
                     "kind": "video",
                     "filename": "out.mp4",
                     "subfolder": "",
-                    "type": "mzsj",
+                    "type": "local-video",
                     "source_path": "/tmp/out.mp4",
                     "view_url": None,
                 }
@@ -277,7 +275,7 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(outcome["prompt_id"], "abc-123")
         self.assertEqual(outcome["status"], "completed")
         self.assertEqual(outcome["run_dir"], "/tmp/project/runs/r1")
-        self.assertEqual(outcome["artifacts"][0]["type"], "mzsj")
+        self.assertEqual(outcome["artifacts"][0]["type"], "local-video")
         self.assertEqual(outcome["run_facts"]["run_id"], "r1")
 
     def test_run_workflow_falls_back_when_stdout_is_not_json(self):

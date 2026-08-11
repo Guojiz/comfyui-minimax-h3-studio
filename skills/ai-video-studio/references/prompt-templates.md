@@ -57,7 +57,8 @@ Medium: photoreal live-action footage
 
 ## 四、完整范例 C：15 秒品牌片（多参考素材，API 平台直调场景）
 
-> 是否支持素材上传取决于所选 workflow/provider/profile；当前 MZSJ videos 契约要求 HTTPS 图片 URL。
+> 是否支持素材上传取决于所选 workflow/外部服务配置；第三方服务可能要求 HTTPS 图片 URL、
+> 显式授权或额外配置。选择外部服务前先向客户确认，不默认使用任何服务。
 > 素材按上传顺序编号，逐个写清用途。超过 15 秒或多镜头叙事先读 `long-video.md`。
 
 ```

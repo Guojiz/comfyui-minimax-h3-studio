@@ -80,7 +80,8 @@ ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -of d
 ```markdown
 日期：2026-08-08
 任务：镜头03 文生视频
-失败路径：~/ComfyUI-Installs/ComfyUI/ComfyUI/output/mzsj/xxx.mp4
+失败路径：ComfyUI 实例的 output 目录下对应服务子目录（例如 `output/<service>/xxx.mp4`），
+以 run 记录中的实例与产物事实为准。
 现象：脸部漂移、结尾黑帧
 已改参数：prompt 增加人物外貌清单；duration 保持 5
 结果对比：v2 脸部稳定，黑帧仍存在

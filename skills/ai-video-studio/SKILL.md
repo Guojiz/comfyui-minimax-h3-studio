@@ -118,7 +118,7 @@ Codex 配置了随 Skill 提供的 `mcp/comfyui_mcp.py` 时，优先通过 MCP �
 FFmpeg 后期与 approved-only 交付按 `references/post-production.md` 执行；当前在得到 fixture
 验证前保持 `long-video: design documented, execution unverified`。
 
-正式库中的每个 workflow 必须声明用途、输入输出、依赖、provider/profile、来源、许可和验证状态。
+正式库中的每个 workflow 必须声明用途、输入输出、依赖、部署配置、来源、许可和验证状态。
 项目修改版放项目 `workflows/`；许可或验证不明的外部 workflow 只能作为本地研究材料，不能冒充正式能力。
 详情见 `references/comfyui-workflows.md`。
 
@@ -127,16 +127,16 @@ FFmpeg 后期与 approved-only 交付按 `references/post-production.md` 执行�
 始终区分：
 
 ```text
-模型能力 != provider API 契约 != 当前部署 profile
+模型能力 != 实例部署配置 != 外部服务契约
 ```
 
 - 模型/创作知识放提示词 reference；
-- provider 描述接口字段、状态和下载契约；
-- profile 描述当前实例的默认值、限制和实测观察；
+- 实例部署配置描述当前 ComfyUI 实例的默认模型、尺寸、限制和实测观察；
+- 外部服务契约只有在用户明确选择某个服务时才描述其接口、状态和下载规则；
 - API Key 只保存在本机忽略文件中，不进入对话、workflow 或 Git。
 
-只有 profile 限制影响当前请求时才向客户简要说明。不要把某个实例的 `768x448`、耗时或供应商
-字段写成整个 H3 或 Studio 的永久限制。
+只有实例配置限制影响当前请求时才向客户简要说明。本 Skill 只绑定 ComfyUI，不内置、不默认
+任何模型或 API 服务；使用任何外部服务前必须先向客户确认服务、配置与费用授权。
 
 ## 质量、返工与长视频
 

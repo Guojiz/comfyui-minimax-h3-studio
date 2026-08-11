@@ -53,8 +53,8 @@ class DeliveryTests(unittest.TestCase):
                 ],
                 extra={
                     "run": "run-1",
-                    "workflow": "mzsj-video",
-                    "instance": "mzsj-remote",
+                    "workflow": "video-wf-1",
+                    "instance": "local-comfy",
                     "decision": "2026-08-10 approved",
                 },
             )
@@ -75,8 +75,8 @@ class DeliveryTests(unittest.TestCase):
             self.assertEqual(by_role["video"]["sha256"], sha256(b"aaa"))
             self.assertEqual(by_role["video"]["source"], str(files["a.mp4"].resolve()))
             self.assertEqual(by_role["video"]["run"], "run-1")
-            self.assertEqual(by_role["video"]["workflow"], "mzsj-video")
-            self.assertEqual(by_role["video"]["instance"], "mzsj-remote")
+            self.assertEqual(by_role["video"]["workflow"], "video-wf-1")
+            self.assertEqual(by_role["video"]["instance"], "local-comfy")
             self.assertEqual(by_role["video"]["decision"], "2026-08-10 approved")
             self.assertEqual(by_role["subtitle"]["language"], "zh")
             self.assertEqual(by_role["subtitle"]["sha256"], sha256(b"bbb"))

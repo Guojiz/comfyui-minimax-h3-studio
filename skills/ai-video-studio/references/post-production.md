@@ -123,8 +123,8 @@ ffmpeg -ss 00:00:01 -i shot-01.mp4 -frames:v 1 -q:v 2 frame-01.png
 {
   "schema_version": 1,
   "run": "run-20260810-120000-abc123",
-  "workflow": "mzsj-video",
-  "instance": "mzsj-remote",
+  "workflow": "video-wf-1",
+  "instance": "local-comfy",
   "decision": "2026-08-10 客户确认交付版本",
   "files": [
     {"path": "shots/final-rough-cut/final.mp4", "role": "video"},

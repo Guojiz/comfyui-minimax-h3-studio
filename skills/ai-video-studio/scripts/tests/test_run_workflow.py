@@ -154,22 +154,22 @@ class DryRunJsonTests(unittest.TestCase):
         self.assertEqual(payload["status"], "prepared")
 
 
-class MzsjArtifactTests(unittest.TestCase):
-    def test_extracts_mzsj_video_paths(self):
+class LocalVideoArtifactTests(unittest.TestCase):
+    def test_extracts_local_video_paths(self):
         outputs = {
             "7": {
                 "ui": {
-                    "video_paths": ["/output/mzsj/mzsj_task_123.mp4"],
-                    "video_filenames": ["mzsj_task_123.mp4"],
+                    "video_paths": ["/output/local/generated_task_123.mp4"],
+                    "video_filenames": ["generated_task_123.mp4"],
                 }
             }
         }
-        artifacts = runner.extract_mzsj_artifacts(outputs)
+        artifacts = runner.extract_local_video_artifacts(outputs)
         self.assertEqual(len(artifacts), 1)
         self.assertEqual(artifacts[0]["kind"], "video")
-        self.assertEqual(artifacts[0]["type"], "mzsj")
-        self.assertEqual(artifacts[0]["filename"], "mzsj_task_123.mp4")
-        self.assertEqual(artifacts[0]["source_path"], "/output/mzsj/mzsj_task_123.mp4")
+        self.assertEqual(artifacts[0]["type"], "local-video")
+        self.assertEqual(artifacts[0]["filename"], "generated_task_123.mp4")
+        self.assertEqual(artifacts[0]["source_path"], "/output/local/generated_task_123.mp4")
 
 
 if __name__ == "__main__":

@@ -13,12 +13,12 @@ Git-ignored `.local-sources/research-workflows/` directory for study and adaptat
 A workflow may enter the distributable Skill assets only when all of these are known:
 
 - purpose and semantic inputs/outputs;
-- required nodes, models and provider/profile;
+- required nodes, models and deployment configuration;
 - source and redistribution license;
 - verification status: `untested`, `dry-run` or `live-tested`, with date and scope;
 - no private paths, credentials or unlicensed media.
 
-满足用途、语义输入输出、依赖、provider/profile、来源、再分发许可、验证级别和隐私检查后，才能把
+满足用途、语义输入输出、依赖、部署配置、来源、再分发许可、验证级别和隐私检查后，才能把
 本地研究 workflow 晋升到可发布正式库。项目修改版始终先复制到 `<project>/workflows/`。
 
 Use `skills/ai-video-studio/scripts/workflow-doctor.py` before execution and the generic
