@@ -100,6 +100,13 @@ auto-selected but always reported; multiple instances require an explicit
 project selection via `select_instance`, persisted in
 `.ai-video-studio/instance.lock.json` plus a `decisions.md` line.
 
+Three connection modes are supported and none is assumed by default: a remote
+ComfyUI instance, a locally deployed ComfyUI instance, or third-party API keys
+fed through local ComfyUI custom nodes. The first two are catalog entries; the
+third lives in the user's local adapters (never shipped by this repository) and
+always requires an explicit customer choice of service, configuration, and
+cost authorization first. See `references/connection-modes.md`.
+
 ## Semantic input bindings
 
 Manifests can declare a `bindings` map from semantic inputs to node fields, so
