@@ -4,6 +4,20 @@ An open Skill/Plugin that teaches an existing agent how to make videos. It does 
 agent runtime, or general orchestrator: the host agent (Codex by default) already understands the customer, invokes tools,
 and delivers the work.
 
+<p align="center">
+  <a href="https://guojiz.github.io/"><img alt="Website" src="https://img.shields.io/badge/website-guojiz.github.io-111111?style=flat-square"></a>
+  <a href="https://github.com/Guojiz/Sponsors"><img alt="Sponsor" src="https://img.shields.io/badge/sponsor-support-111111?style=flat-square"></a>
+</p>
+
+<p align="center">
+  <a href="https://guojiz.github.io/"><strong>Author website</strong></a>
+  · <a href="https://x.com/guojizh">X</a>
+  · <a href="https://space.bilibili.com/3493114115263006">Bilibili</a>
+  · <a href="https://youtube.com/@guojizh">YouTube</a>
+  · <a href="https://github.com/Guojiz/Sponsors">Sponsor</a>
+</p>
+
+
 ## Core model
 
 - **Agent** — operator: understand the goal, choose the next step, inspect, revise, and deliver.
@@ -96,3 +110,27 @@ multi-segment fixture acceptance has not been run, so long-video stays
 - Other `SKILL.md` hosts: copy the Skill and map semantic actions to their own file, terminal, and multimodal tools.
 
 The Qoder manifest is compatibility packaging; it is not a second agent runtime.
+
+## Website and other links
+
+No separate product site is required for this repository. The public face of the work is the author website, this GitHub repo, and the projects below.
+
+| | |
+| --- | --- |
+| **Project page** | https://guojiz.github.io/ai-video-studio/ |
+| **Author website** | https://guojiz.github.io/ |
+| **X** | https://x.com/guojizh |
+| **Bilibili** | https://space.bilibili.com/3493114115263006 |
+| **YouTube** | https://youtube.com/@guojizh |
+| **Sponsor** | https://github.com/Guojiz/Sponsors |
+
+### Other open-source projects
+
+- [GitLearnOS](https://guojiz.github.io/gitlearnos/) — learner-owned Git memory
+- [Word Snap](https://guojiz.github.io/word-snap/) — bilingual vocabulary matching
+- [AI Subtitle Extractor](https://github.com/Guojiz/ai-subtitle-extractor)
+- [Design Master](https://github.com/Guojiz/design-master)
+- [AI Video Studio](https://github.com/Guojiz/comfyui-minimax-h3-studio)
+- [llm-provider-compat](https://github.com/Guojiz/llm-provider-compat)
+- [Claude Desktop Tweak Models](https://github.com/Guojiz/claude-desktop-tweak-models)
+- All projects: [github.com/Guojiz](https://github.com/Guojiz)
